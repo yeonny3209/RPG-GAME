@@ -6,7 +6,7 @@ import { sfx, toggleMute, isMuted, stopMusic } from '../audio.js';
 
 const CONTROLS = [
   ['방향키 / WASD', '이동'],
-  ['스페이스 / J', '공격'],
+  ['좌클릭 / 스페이스', '공격 (클릭한 방향으로)'],
   ['E / Enter', '말 걸기, 상자 열기, 대화 넘기기'],
   ['1 / 2', 'HP 포션 / 마나 포션 마시기'],
   ['Z X C V', '스킬 (레벨이 오르면 배움)'],

@@ -2,8 +2,9 @@
 // talk(id, w) 는 NPC에게 말을 걸었을 때의 대사와 대화가 끝난 뒤 할 일을 돌려준다.
 // w 는 WorldScene (상점 열기, 아이템 주기 등의 기능을 가지고 있다).
 
-import { G, questState, startQuest, addItem, equipIfBetter } from '../state.js';
+import { G, questState, startQuest, addItem, equipIfBetter, countItem, removeItem } from '../state.js';
 import { FROST_MIN_LEVEL } from '../config.js';
+import { josa } from '../ui.js';
 
 export const PLAYER_NAME = '리오';
 
@@ -28,7 +29,12 @@ export const QUESTS = {
   cat: { title: '잃어버린 고양이' },
   herb: { title: '늪의 달빛 풀', goal: 3 },
   golem: { title: '서리 봉우리의 골렘' },
+  wisp: { title: '도깨비불 사냥', goal: 6 },
+  forge: { title: '대장장이의 재료', goal: 3 },
+  hydra: { title: '독안개 소굴의 히드라' },
 };
+
+export const FORGE_LEVEL = 6; // 브론이 재료 퀘스트를 주는 레벨
 
 // 지금 해야 할 일 (화면 오른쪽 위에 표시)
 export function objective(id) {
@@ -64,6 +70,21 @@ export function objective(id) {
     if (st === 'ready') return '마을의 등산가에게 알리자';
     return null;
   }
+  if (id === 'wisp') {
+    if (st === 'active') return `안개 늪의 도깨비불 ${G.progress.wisp || 0}/6`;
+    if (st === 'ready') return '잡화상 미나에게 보고하자';
+    return null;
+  }
+  if (id === 'forge') {
+    if (st !== 'active') return null;
+    const n = countItem('ice_crystal');
+    return n >= 3 ? '브론에게 얼음 결정을 가져가자' : `얼음 결정 ${n}/3 (서리 봉우리의 얼음 정령)`;
+  }
+  if (id === 'hydra') {
+    if (st === 'active') return '안개 늪 남쪽 독안개 소굴의 히드라를 쓰러뜨리자';
+    if (st === 'ready') return '약초꾼 할머니에게 알리자';
+    return null;
+  }
   return null;
 }
 
@@ -73,7 +94,17 @@ export function marker(id) {
   const main = questState('main');
   switch (id) {
     case 'chief': return main === 'none' ? '!' : f.crown && main !== 'done' ? '?' : null;
-    case 'smith': return main === 'active' && !f.got_sword ? '!' : null;
+    case 'smith': {
+      if (main === 'active' && !f.got_sword) return '!';
+      const st = questState('forge');
+      if (st === 'none' && f.got_sword && G.level >= FORGE_LEVEL) return '!';
+      return st === 'active' && countItem('ice_crystal') >= 3 ? '?' : null;
+    }
+    case 'mina': {
+      const st = questState('wisp');
+      if (st === 'none' && main !== 'none') return '!';
+      return st === 'ready' ? '?' : null;
+    }
     case 'wizard': return main === 'active' && f.got_sword && !f.rock_removed ? '!' : null;
     case 'toto': {
       const st = questState('cat');
@@ -86,7 +117,10 @@ export function marker(id) {
     case 'cat': return questState('cat') === 'active' ? '?' : null;
     case 'herbalist': {
       const st = questState('herb');
-      return st === 'none' ? '!' : st === 'ready' ? '?' : null;
+      if (st !== 'done') return st === 'none' ? '!' : st === 'ready' ? '?' : null;
+      const hy = questState('hydra');
+      if (hy === 'none') return f.hydra_defeated ? '?' : '!';
+      return hy === 'ready' ? '?' : null;
     }
     case 'climber': {
       const st = questState('golem');
@@ -157,17 +191,70 @@ export function talk(id, w) {
           },
         };
       }
-      return {
-        lines: [L(S, '어서 와! 더 좋은 무기와 갑옷이 필요하면 골라 봐.')],
-        onDone: () => w.openShop('blacksmith'),
-      };
+      const fs = questState('forge');
+      if (fs === 'none' && f.got_sword && G.level >= FORGE_LEVEL) {
+        return {
+          lines: [
+            L(S, `${P}, 너 정말 많이 강해졌구나! 이제 평범한 갑옷으로는 부족하겠어.`),
+            L(S, '서리 봉우리의 얼음 정령을 쓰러뜨리면 「얼음 결정」이 나온다더군.'),
+            L(S, '그걸 3개만 가져다주면, 내 평생 최고의 갑옷을 만들어 주마!'),
+          ],
+          onDone: () => { startQuest('forge'); w.toast('퀘스트 시작: 대장장이의 재료'); },
+        };
+      }
+      if (fs === 'active' && countItem('ice_crystal') >= 3) {
+        return {
+          lines: [
+            L(S, '오오, 얼음 결정이 3개나! 잠깐만 기다려라…'),
+            L('', '(쾅! 쾅! 쾅! 망치 소리가 대장간에 울려 퍼진다…)'),
+            L(S, '완성이다! 「용사의 갑옷」! 왕국 최고의 갑옷이지!'),
+          ],
+          onDone: () => {
+            removeItem('ice_crystal', 3);
+            G.quests.forge = 'done';
+            addItem('hero_armor');
+            equipIfBetter('hero_armor');
+            w.itemGot('hero_armor', 1, '용사의 갑옷을 받아 장착했다! (방어력 +20)');
+            w.toast('퀘스트 완료: 대장장이의 재료');
+          },
+        };
+      }
+      const extra = fs === 'active'
+        ? [L(S, `얼음 결정은 ${countItem('ice_crystal')}개 모았군. 3개가 필요해!`)]
+        : [L(S, '어서 와! 더 좋은 무기와 갑옷이 필요하면 골라 봐.')];
+      return { lines: extra, onDone: () => w.openShop('blacksmith') };
     }
 
-    case 'mina':
-      return {
-        lines: [L('미나', '어서 오세요~ 오늘의 추천은 빨간 포션이에요!')],
-        onDone: () => w.openShop('general'),
-      };
+    case 'mina': {
+      const M = '미나';
+      const ws = questState('wisp');
+      if (ws === 'none' && questState('main') !== 'none') {
+        return {
+          lines: [
+            L(M, `${P}! 마침 부탁할 게 있었어요.`),
+            L(M, '밤에도 꺼지지 않는 등불을 만들고 싶은데, 도깨비불의 빛이 필요하거든요.'),
+            L(M, '숲 동쪽 안개 늪에 사는 도깨비불을 6마리만 잡아 주실래요?'),
+          ],
+          onDone: () => { startQuest('wisp'); w.toast('퀘스트 시작: 도깨비불 사냥'); },
+        };
+      }
+      if (ws === 'ready') {
+        return {
+          lines: [L(M, '와, 정말 6마리나! 이걸로 예쁜 등불을 만들 수 있겠어요.'), L(M, '고마워요! 이건 제 가게에서 제일 좋은 마나 포션이에요.')],
+          onDone: () => {
+            G.quests.wisp = 'done';
+            G.gold += 100;
+            addItem('mana_potion', 4);
+            w.itemGot('mana_potion', 4, '100골드와 마나 포션 4개를 받았다!');
+            w.toast('퀘스트 완료: 도깨비불 사냥');
+          },
+        };
+      }
+      const line = ws === 'active'
+        ? L(M, `도깨비불은 ${G.progress.wisp || 0}마리 잡았네요. 갑자기 옆에 나타나니까 조심하세요!`)
+        : L(M, '어서 오세요~ 오늘의 추천은 빨간 포션이에요!');
+      return { lines: [line], onDone: () => w.openShop('general') };
+    }
 
     case 'inn':
       return {
@@ -304,7 +391,39 @@ export function talk(id, w) {
           },
         };
       }
-      return { lines: [L(H, '네 덕분에 약을 잔뜩 만들었단다. 몸조심하거라.')] };
+      const hy = questState('hydra');
+      const hydraReward = () => {
+        G.quests.hydra = 'done';
+        G.gold += 400;
+        addItem('big_potion', 3);
+        w.itemGot('big_potion', 3, '400골드와 큰 빨간 포션 3개를 받았다!');
+        w.toast('퀘스트 완료: 독안개 소굴의 히드라');
+      };
+      if (hy === 'none' && f.hydra_defeated) {
+        return {
+          lines: [L(H, '독안개가 걷혔구나…! 설마 네가 히드라를 쓰러뜨린 게냐?'), L(H, '정말 장하구나. 이건 꼭 받아 두렴.')],
+          onDone: hydraReward,
+        };
+      }
+      if (hy === 'none') {
+        return {
+          lines: [
+            L(H, '약은 잘 만들었다만… 요즘 늪 남쪽에서 독안개가 흘러나오고 있단다.'),
+            L(H, '「독안개 소굴」에서 머리가 셋 달린 독룡, 히드라가 깨어난 게야.'),
+            L(H, '독을 뿜고, 땅에 독 웅덩이를 만든다더구나. 웅덩이는 밟지 말거라.'),
+            L(H, '레벨 6은 되어야 상대할 수 있을 게다. 부디 몸조심하렴.'),
+          ],
+          onDone: () => { startQuest('hydra'); w.toast('퀘스트 시작: 독안개 소굴의 히드라'); },
+        };
+      }
+      if (hy === 'active') return { lines: [L(H, '히드라는 늪 남쪽 길 끝에 있단다. 독 웅덩이를 조심하거라.')] };
+      if (hy === 'ready') {
+        return {
+          lines: [L(H, '독안개가 걷혔어! 정말 해냈구나!'), L(H, '늪이 다시 깨끗해지겠구나. 이건 감사의 표시란다.')],
+          onDone: hydraReward,
+        };
+      }
+      return { lines: [L(H, '네 덕분에 늪이 다시 깨끗해졌단다. 고맙다.')] };
     }
 
     case 'climber': {
@@ -376,9 +495,13 @@ export const NARRATION = {
   doorLocked: [L('', '거대한 문이 굳게 잠겨 있다.'), L(PLAYER_NAME, '(어딘가에 열쇠가 있을 것 같아.)')],
   doorOpen: [L('', '그림자 열쇠를 사용했다! 문이 열린다…')],
   guardBlock: [L('경비병', '잠깐! 숲은 위험해. 촌장님께 먼저 인사드리고 가렴.')],
-  frostBlock: (lv) => [
-    L('바위', `잠깐! 서리 봉우리는 정말 위험해. 레벨 ${FROST_MIN_LEVEL}은 되어야 해. (지금 레벨 ${lv})`),
-    L('바위', '숲이나 안개 늪에서 조금 더 강해지고 와!'),
+  levelBlock: (who, place, min, lv) => [
+    L(who, `잠깐! ${josa(place, '은', '는')} 정말 위험해. 레벨 ${min}은 되어야 해. (지금 레벨 ${lv})`),
+    L(who, '다른 곳에서 조금 더 강해지고 와!'),
+  ],
+  hydraIntro: [
+    L('', '쉬이이익…!'),
+    L('', '(독안개 속에서 머리 셋 달린 독룡이 고개를 들었다!)'),
   ],
   golemIntro: [
     L('', '쿠오오오오…'),

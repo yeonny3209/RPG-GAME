@@ -217,14 +217,26 @@ const SWAMP = build({
     [34, 4, 7, 2, '#'],
     [37, 5, 1, 1, 'D'],
     [31, 6, 8, 2, 'm'],
+    [24, 26, 2, 6, 'm'],  // 남쪽 -> 독안개 소굴
   ],
-  clear: [[0, 13, 13, 4], [8, 4, 26, 4], [29, 4, 4, 23], [16, 23, 18, 4], [33, 1, 9, 9], [17, 11, 6, 6]],
+  clear: [[0, 13, 13, 4], [8, 4, 26, 4], [29, 4, 4, 23], [16, 23, 18, 4], [33, 1, 9, 9], [17, 11, 6, 6], [23, 25, 4, 7]],
   scatter: [
     { ch: 'd', n: 45, seed: 11 },
     { ch: 'R', n: 40, seed: 22 },
     { ch: 'w', n: 10, seed: 33, size: 2 },
   ],
   keep: SWAMP_KEEP,
+});
+
+const DEN = build({
+  w: 26, h: 20, fill: 'm', border: 'd',
+  rects: [
+    [12, 0, 2, 1, 'm'],   // 입구 -> 안개 늪
+    [1, 1, 4, 3, 'w'], [21, 1, 4, 3, 'w'], [1, 16, 4, 3, 'w'], [21, 16, 4, 3, 'w'],
+    [5, 1, 6, 1, 's'], [15, 1, 6, 1, 's'], [5, 18, 16, 1, 's'],
+  ],
+  clear: [[3, 3, 20, 14], [10, 0, 6, 4]],
+  scatter: [{ ch: 'R', n: 12, seed: 7 }, { ch: 'd', n: 6, seed: 8 }],
 });
 
 const FROST_KEEP = [
@@ -264,7 +276,7 @@ export const MAPS = {
     },
     exits: [
       { x: 19, y: 0, w: 2, h: 1, to: 'forest', spawn: 'south', gate: 'guard' },
-      { x: 39, y: 17, w: 1, h: 2, to: 'frost', spawn: 'west', gate: 'level' },
+      { x: 39, y: 17, w: 1, h: 2, to: 'frost', spawn: 'west', minLevel: 5, who: '바위', place: '서리 봉우리' },
     ],
     npcs: [
       { id: 'chief', x: 7, y: 6 },
@@ -377,8 +389,12 @@ export const MAPS = {
     bgm: 'swamp',
     spawns: {
       west: [2, 14.5],
+      south: [24.5, 29],
     },
-    exits: [{ x: 0, y: 14, w: 1, h: 2, to: 'forest', spawn: 'east' }],
+    exits: [
+      { x: 0, y: 14, w: 1, h: 2, to: 'forest', spawn: 'east' },
+      { x: 24, y: 31, w: 2, h: 1, to: 'den', spawn: 'north', minLevel: 6, who: '약초꾼 할머니', place: '독안개 소굴' },
+    ],
     npcs: [{ id: 'herbalist', x: 37, y: 6 }],
     monsters: [
       { type: 'toad', x: 6, y: 9 }, { type: 'toad', x: 14, y: 23 }, { type: 'toad', x: 24, y: 22 },
@@ -392,6 +408,21 @@ export const MAPS = {
       { id: 'swamp_dagger', x: 41, y: 20, item: 'venom_dagger', count: 1 },
     ],
     herbs: [{ id: 'herb_1', x: 4, y: 4 }, { id: 'herb_2', x: 40, y: 27 }, { id: 'herb_3', x: 6, y: 27 }],
+    particles: 'fireflies',
+  },
+
+  den: {
+    name: '독안개 소굴',
+    rows: DEN,
+    bgm: 'swamp',
+    spawns: {
+      north: [12.5, 2],
+    },
+    exits: [{ x: 12, y: 0, w: 2, h: 1, to: 'swamp', spawn: 'south' }],
+    npcs: [],
+    monsters: [],
+    chests: [],
+    boss: { x: 12.5, y: 10, kind: 'hydra' },
     particles: 'fireflies',
   },
 

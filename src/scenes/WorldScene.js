@@ -1,6 +1,6 @@
 // 실제 게임 플레이 화면: 맵, 주인공, 몬스터, NPC, 상자, 출구
 
-import { TILE, ZOOM, FONT, DEBUG, INN_PRICE, FROST_MIN_LEVEL } from '../config.js';
+import { TILE, ZOOM, FONT, DEBUG, INN_PRICE } from '../config.js';
 import { MAPS, LEGEND, T } from '../data/maps.js';
 import { ITEMS } from '../data/items.js';
 import { SKILLS } from '../data/skills.js';
@@ -38,6 +38,7 @@ export class WorldScene extends Phaser.Scene {
     this.interactables = [];
     this.npcList = [];
     this.spikes = [];
+    this.puddles = [];
     this.rocks = [];
     this.lastHint = undefined;
     this.boss = null;
@@ -110,7 +111,7 @@ export class WorldScene extends Phaser.Scene {
     if (!G.flags.intro_done) {
       G.flags.intro_done = true;
       this.time.delayedCall(600, () => this.say(NARRATION.intro, () => {
-        this.toast('방향키: 이동   스페이스: 공격   E: 말 걸기   I: 가방   Esc: 메뉴');
+        this.toast('방향키: 이동   마우스 왼쪽 클릭 / 스페이스: 공격   E: 말 걸기   I: 가방   Esc: 메뉴');
       }));
     }
 
@@ -255,6 +256,9 @@ export class WorldScene extends Phaser.Scene {
       up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT', w: 'W', a: 'A', s: 'S', d: 'D',
     });
     kb.on('keydown-SPACE', () => this.attack());
+    // 마우스 왼쪽 버튼: 클릭한 쪽을 바라보며 공격 (누르고 있으면 계속 공격)
+    this.input.mouse?.disableContextMenu();
+    this.input.on('pointerdown', (ptr) => { if (ptr.leftButtonDown()) this.attack(ptr); });
     kb.on('keydown-J', () => this.attack());
     kb.on('keydown-E', () => this.interact());
     kb.on('keydown-ENTER', () => this.interact());
@@ -278,7 +282,7 @@ export class WorldScene extends Phaser.Scene {
       kb.on('keydown-N', () => { this.godMode = !this.godMode; this.toast('[디버그] 무적 ' + (this.godMode ? '켜짐' : '꺼짐')); });
       kb.on('keydown-H', () => { G.hp = maxHp(); });
       kb.on('keydown-T', () => {
-        const order = ['village', 'forest', 'swamp', 'cave', 'throne', 'frost'];
+        const order = ['village', 'forest', 'swamp', 'den', 'cave', 'throne', 'frost'];
         const next = order[(order.indexOf(this.mapId) + 1) % order.length];
         this.changeMap(next, Object.keys(MAPS[next].spawns)[0]);
       });
@@ -303,11 +307,18 @@ export class WorldScene extends Phaser.Scene {
     const iy = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0);
     if (this.transitioning) this.player.setVelocity(0);
     else this.player.move(ix, iy, time);
+    const ptr = this.input.activePointer;
+    if (ptr.isDown && ptr.leftButtonDown() && time >= this.player.nextAttack) this.attack(ptr);
     this.player.setDepth(this.player.y);
 
     for (const m of this.monsters.getChildren().slice()) m.update(time, delta);
     for (const n of this.npcList) if (n.active) n.update(time);
 
+    for (const pd of this.puddles) {
+      if (pd.active2 && Math.abs(pd.x - this.player.x) < 11 && Math.abs(pd.y - this.player.footY) < 6) {
+        this.player.hurt(calcDamage(pd.dmg, def()), pd.x, pd.y - 10);
+      }
+    }
     for (const s of this.spikes) {
       if (s.up && Math.abs(s.x - this.player.x) < 8 && Math.abs(s.y - this.player.footY) < 7) {
         this.player.hurt(calcDamage(20, def()), s.x, s.y - 10);
@@ -325,8 +336,16 @@ export class WorldScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- 전투
 
-  attack() {
+  attack(ptr) {
     if (!this.canAct()) return;
+    if (ptr && this.time.now >= this.player.attackUntil) {
+      const wp = this.cameras.main.getWorldPoint(ptr.x, ptr.y);
+      const dx = wp.x - this.player.x;
+      const dy = wp.y - (this.player.y + 3);
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+        this.player.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      }
+    }
     const rect = this.player.tryAttack(this.time.now);
     if (!rect) return;
     const hitSet = new Set();
@@ -420,6 +439,16 @@ export class WorldScene extends Phaser.Scene {
     }
     this.floatText(m.x, m.y - 16, `+${d.exp} EXP`, '#9ad8ff');
     this.gainExp(d.exp);
+    if (m.kind === 'wisp' && questState('wisp') === 'active') {
+      G.progress.wisp = (G.progress.wisp || 0) + 1;
+      if (G.progress.wisp >= 6) {
+        G.quests.wisp = 'ready';
+        this.toast('도깨비불을 6마리 잡았다! 잡화상 미나에게 돌아가자.');
+      }
+    }
+    if (m.kind === 'icespirit' && questState('forge') === 'active' && Math.random() < 0.6) {
+      this.dropItem('ice_crystal', m.x - 6, m.y + 2);
+    }
     if (m.kind === 'slime' && questState('slime') === 'active') {
       G.progress.slime = (G.progress.slime || 0) + 1;
       if (G.progress.slime >= 5) {
@@ -445,6 +474,34 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
+  // 독 웅덩이: 0.65초 동안 흐릿하게 예고한 뒤 3.5초간 밟으면 피해
+  spawnPuddle(x, y, dmg) {
+    const pd = this.add.image(x, y, 'puddle', 0).setDepth(-4).setAlpha(0).setScale(0.6);
+    pd.dmg = dmg;
+    pd.active2 = false;
+    this.puddles.push(pd);
+    this.tweens.add({ targets: pd, alpha: 0.4, scale: 1, duration: 250 });
+    this.time.delayedCall(650, () => {
+      if (!pd.active) return;
+      pd.active2 = true;
+      pd.setAlpha(0.95);
+    });
+    this.time.delayedCall(4150, () => {
+      if (!pd.active) return;
+      pd.active2 = false;
+      this.tweens.add({ targets: pd, alpha: 0, duration: 400, onComplete: () => this.removePuddle(pd) });
+    });
+  }
+
+  removePuddle(pd) {
+    this.puddles = this.puddles.filter((x) => x !== pd);
+    pd.destroy();
+  }
+
+  clearPuddles() {
+    for (const pd of this.puddles.slice()) this.removePuddle(pd);
+  }
+
   // 보스 주변 충격파: 가까이 있으면 피해
   bossNova(b) {
     const cx = b.x;
@@ -461,8 +518,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   onBossDefeated(boss) {
-    if (boss.kind === 'golem') return this.onGolemDefeated(boss);
+    if (boss.kind !== 'boss') return this.onMiniBossDefeated(boss);
     G.flags.boss_defeated = true;
+    this.clearPuddles();
     this.bossActive = false;
     bus.emit('boss', { show: false });
     stopMusic();
@@ -480,8 +538,12 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  onGolemDefeated(boss) {
-    G.flags.golem_defeated = true;
+  // 서리 골렘, 독룡 히드라
+  onMiniBossDefeated(boss) {
+    const cfg = boss.cfg;
+    G.flags[cfg.flag] = true;
+    this.clearPuddles();
+    for (const m of this.monsters.getChildren()) if (m.summoned && !m.dead) m.die();
     this.bossActive = false;
     bus.emit('boss', { show: false });
     stopMusic();
@@ -491,15 +553,15 @@ export class WorldScene extends Phaser.Scene {
     for (const o of this.orbs.getChildren().slice()) o.destroy();
     this.floatText(boss.x, boss.y - 20, `+${boss.stats.exp} EXP`, '#9ad8ff', 9);
     this.gainExp(boss.stats.exp);
-    if (questState('golem') === 'active') {
-      G.quests.golem = 'ready';
-      this.toast('서리 골렘을 쓰러뜨렸다! 마을의 등산가에게 알리자.');
+    if (questState(cfg.quest) === 'active') {
+      G.quests[cfg.quest] = 'ready';
+      this.toast(cfg.readyMsg);
     } else {
-      this.toast('서리 골렘을 쓰러뜨렸다!');
+      this.toast(`${boss.stats.name}${josa(boss.stats.name, '을', '를').slice(boss.stats.name.length)} 쓰러뜨렸다!`);
     }
     this.time.delayedCall(1700, () => {
       this.dropCoin(boss.x - 10, boss.y + 6, boss.stats.gold[0]);
-      this.dropItem('frost_armor', boss.x + 8, boss.y + 6);
+      this.dropItem(cfg.reward, boss.x + 8, boss.y + 6);
       sfx.chest();
       playMusic(this.mapDef.bgm);
     });
@@ -965,9 +1027,13 @@ export class WorldScene extends Phaser.Scene {
       this.say(NARRATION.guardBlock);
       return;
     }
-    if (e.gate === 'level' && G.level < FROST_MIN_LEVEL) {
-      this.player.body.reset(this.player.x - 12, this.player.y);
-      this.say(NARRATION.frostBlock(G.level));
+    if (e.minLevel && G.level < e.minLevel) {
+      // 출구에서 맵 안쪽으로 살짝 밀어낸다
+      const cx = (e.x + e.w / 2) * TILE;
+      const cy = (e.y + e.h / 2) * TILE;
+      const a = Phaser.Math.Angle.Between(cx, cy, this.mapW / 2, this.mapH / 2);
+      this.player.body.reset(this.player.x + Math.cos(a) * 14, this.player.y + Math.sin(a) * 14);
+      this.say(NARRATION.levelBlock(e.who, e.place, e.minLevel, G.level));
       return;
     }
     this.changeMap(e.to, e.spawn);

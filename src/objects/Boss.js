@@ -5,6 +5,9 @@
 // 「서리 골렘」 (중간 보스)
 //   1페이즈: 몸통 박치기, 3방향 얼음 조각, (가까이 붙으면) 땅 내려치기
 //   2페이즈: 빨라짐 + 8방향 얼음 조각, 박치기 연속
+// 「독룡 히드라」 (중간 보스)
+//   1페이즈: 부채꼴 독 뿜기, 독 웅덩이, (가까이 붙으면) 꼬리 내려치기
+//   2페이즈: 빨라짐 + 독두꺼비 소환, 8방향 독 구슬
 // 모든 공격 전에는 깜빡이는 예고 동작이 있다.
 
 import { Monster } from './Monster.js';
@@ -33,9 +36,28 @@ export const BOSSES = {
     phase2Tint: 0x9ad8ff,
     flag: 'golem_defeated',
     intro: 'golemIntro',
+    quest: 'golem', reward: 'frost_armor',
+    readyMsg: '서리 골렘을 쓰러뜨렸다! 마을의 등산가에게 알리자.',
     options(phase, dist) {
       if (phase === 1) return dist < 52 ? ['nova', 'nova', 'slash'] : ['slash', 'orbs3', 'orbs3'];
       return dist < 52 ? ['nova', 'nova', 'slash', 'orbs8'] : ['slash', 'slash', 'orbs8', 'orbs3'];
+    },
+  },
+  hydra: {
+    room: { x1: 40, y1: 56, x2: 376, y2: 272 }, // 독안개 소굴 안쪽 (픽셀)
+    shotTex: 'poison',
+    novaColor: 0x70e040,
+    phase2Tint: 0xc8ff90,
+    flag: 'hydra_defeated',
+    intro: 'hydraIntro',
+    summonType: 'toad',
+    quest: 'hydra', reward: 'hydra_fang',
+    readyMsg: '독룡 히드라를 쓰러뜨렸다! 약초꾼 할머니에게 알리자.',
+    options(phase, dist, summons) {
+      if (phase === 1) return dist < 50 ? ['nova', 'nova', 'fan', 'puddle'] : ['fan', 'fan', 'puddle', 'slash'];
+      const o = ['fan', 'puddle', 'orbs8', summons < 2 ? 'summon' : 'puddle'];
+      if (dist < 50) o.push('nova', 'nova');
+      return o;
     },
   },
 };
@@ -145,7 +167,7 @@ export class Boss extends Monster {
     if (pick === 'teleport') return this.teleport();
     this.pending = pick;
     this.state = 'windup';
-    const base = { slash: 600, orbs3: 500, orbs8: 650, summon: 600, nova: 550 }[pick];
+    const base = { slash: 600, orbs3: 500, orbs8: 650, summon: 600, nova: 550, fan: 550, puddle: 650 }[pick];
     this.stateUntil = this.scene.time.now + base / (this.phase === 2 ? 1.15 : 1);
   }
 
@@ -178,10 +200,34 @@ export class Boss extends Monster {
         this.scene.bossNova(this);
         this.recover(500);
         break;
+      case 'fan':
+        // 플레이어 쪽으로 5갈래 독
+        for (let i = -2; i <= 2; i++) this.scene.fireOrb(this.x, this.y + 6, a + i * 0.24, 100, this.cfg.shotTex, Math.round(this.stats.atk * 0.7));
+        sfx.orb();
+        this.recover(600);
+        break;
+      case 'puddle': {
+        // 플레이어 발밑과 그 주변에 독 웅덩이 (잠깐 뒤에 활성화)
+        const pts = [[p.x, p.y + 4]];
+        for (let i = 0; i < 2; i++) {
+          const ang = Math.random() * Math.PI * 2;
+          pts.push([p.x + Math.cos(ang) * 34, p.y + 4 + Math.sin(ang) * 34]);
+        }
+        for (const [x, y] of pts) {
+          this.scene.spawnPuddle(
+            Phaser.Math.Clamp(x, this.cfg.room.x1, this.cfg.room.x2),
+            Phaser.Math.Clamp(y, this.cfg.room.y1, this.cfg.room.y2),
+            Math.round(this.stats.atk * 0.6),
+          );
+        }
+        sfx.orb();
+        this.recover(500);
+        break;
+      }
       case 'summon':
         sfx.roar();
         [-22, 22].forEach((ox) => {
-          const m = this.scene.spawnMonster('slime', Phaser.Math.Clamp(this.x + ox, this.cfg.room.x1, this.cfg.room.x2), Phaser.Math.Clamp(this.y + 14, this.cfg.room.y1, this.cfg.room.y2));
+          const m = this.scene.spawnMonster(this.cfg.summonType || 'slime', Phaser.Math.Clamp(this.x + ox, this.cfg.room.x1, this.cfg.room.x2), Phaser.Math.Clamp(this.y + 14, this.cfg.room.y1, this.cfg.room.y2));
           m.summoned = true;
           m.setState2('chase');
           m.setAlpha(0);

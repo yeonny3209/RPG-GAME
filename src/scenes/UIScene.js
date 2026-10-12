@@ -67,7 +67,7 @@ export class UIScene extends Phaser.Scene {
     });
 
     // 오른쪽 아래: 조작 안내
-    text(this, GAME_W - 20, GAME_H - 20, 'I 가방   Q 퀘스트   Esc 메뉴', { size: 15, color: '#d8d0c0', origin: [1, 1], stroke: '#000', strokeThickness: 4 });
+    text(this, GAME_W - 20, GAME_H - 20, '클릭 공격   I 가방   Q 퀘스트   Esc 메뉴', { size: 15, color: '#d8d0c0', origin: [1, 1], stroke: '#000', strokeThickness: 4 });
 
     // 아래 가운데: 상호작용 안내
     this.hintBox = this.add.container(GAME_W / 2, GAME_H - 120).setVisible(false);

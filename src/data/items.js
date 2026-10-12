@@ -44,6 +44,10 @@ export const ITEMS = {
     name: '바람의 창', type: 'weapon', atk: 15, price: 260, style: 'spear',
     desc: '멀리까지 닿는 가벼운 창. 공격력 +15',
   },
+  hydra_fang: {
+    name: '히드라의 송곳니', type: 'weapon', atk: 24, price: 600, style: 'dagger', poison: 0.45,
+    desc: '독룡 히드라의 송곳니로 만든 단검. 45% 확률로 독. 공격력 +24',
+  },
   frost_axe: {
     name: '서리 도끼', type: 'weapon', atk: 30, price: 500, style: 'axe',
     desc: '느리지만 넓게 내려치는 얼음 도끼. 공격력 +30',
@@ -65,6 +69,17 @@ export const ITEMS = {
   frost_armor: {
     name: '서리 갑옷', type: 'armor', def: 15, price: 500,
     desc: '서리 골렘의 얼음으로 만든 갑옷. 방어력 +15',
+  },
+
+  hero_armor: {
+    name: '용사의 갑옷', type: 'armor', def: 20, price: 800,
+    desc: '브론이 얼음 결정으로 벼려 낸 최고의 갑옷. 방어력 +20',
+  },
+
+  // material: 퀘스트 재료 (여러 개 겹쳐짐)
+  ice_crystal: {
+    name: '얼음 결정', type: 'material', price: 20,
+    desc: '얼음 정령에게서 얻은 차가운 결정. 대장장이 브론이 찾고 있다.',
   },
 
   shadow_key: {

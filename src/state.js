@@ -78,6 +78,12 @@ export function calcDamage(attack, defense) {
 
 // ---------------------------------------------------------------- 인벤토리
 
+// 포션과 재료는 한 칸에 여러 개 겹쳐진다
+export function isStackable(id) {
+  const t = ITEMS[id].type;
+  return t === 'consumable' || t === 'material';
+}
+
 export function countItem(id) {
   return G.inventory.filter((s) => s.id === id).reduce((a, s) => a + s.count, 0);
 }
@@ -87,7 +93,7 @@ export function hasItem(id) {
 }
 
 export function canAdd(id, count = 1) {
-  const stackable = ITEMS[id].type === 'consumable';
+  const stackable = isStackable(id);
   if (stackable) {
     const s = G.inventory.find((x) => x.id === id && x.count < STACK_MAX);
     if (s && s.count + count <= STACK_MAX) return true;
@@ -97,7 +103,7 @@ export function canAdd(id, count = 1) {
 
 export function addItem(id, count = 1) {
   if (!canAdd(id, count)) return false;
-  if (ITEMS[id].type === 'consumable') {
+  if (isStackable(id)) {
     const s = G.inventory.find((x) => x.id === id && x.count + count <= STACK_MAX);
     if (s) s.count += count;
     else G.inventory.push({ id, count });

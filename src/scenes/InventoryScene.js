@@ -78,7 +78,7 @@ export class InventoryScene extends Phaser.Scene {
       sfx.select();
       this.msg = `${josa(it.name, '을', '를')} 장착했다.`;
     } else {
-      this.msg = '중요한 물건이다. 소중히 간직하자.';
+      this.msg = it.type === 'material' ? '퀘스트에 쓰는 재료다.' : '중요한 물건이다. 소중히 간직하자.';
     }
     this.redraw();
   }

@@ -45,7 +45,7 @@ export class ShopScene extends Phaser.Scene {
     if (this.tab === 0) return this.shop.items.map((id) => ({ id }));
     return G.inventory
       .map((s, i) => ({ id: s.id, slot: i, count: s.count }))
-      .filter((x) => ITEMS[x.id].type !== 'key');
+      .filter((x) => !['key', 'material'].includes(ITEMS[x.id].type));
   }
 
   switchTab(t) {
@@ -142,7 +142,7 @@ export class ShopScene extends Phaser.Scene {
       add(icon(this, RX + 40, 290, 'icon_' + row.id, 4));
       add(text(this, RX + 90, 270, it.name, { size: 24, bold: true }));
       add(text(this, RX, 340, it.desc, { size: 19, wrap: 360 }));
-      const have = it.type === 'consumable' ? countItem(row.id) : hasItem(row.id) ? 1 : 0;
+      const have = it.type === 'consumable' || it.type === 'material' ? countItem(row.id) : hasItem(row.id) ? 1 : 0;
       add(text(this, RX, 430, `가진 개수: ${have}`, { size: 18, color: COLORS.dim }));
     }
     if (this.msg) add(text(this, RX, 500, this.msg, { size: 19, color: COLORS.accent, wrap: 360 }));

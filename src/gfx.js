@@ -536,14 +536,60 @@ function sword(blade, hilt) {
   return p.outline(OUT);
 }
 
-function dagger() {
+function dagger(blade = '#c8e0b0', guard = '#5a3a6a', gem = '#7aff50') {
   const p = new Pix(16, 16);
-  for (let i = 0; i < 6; i++) { p.set(6 + i, 9 - i, '#c8e0b0'); p.set(7 + i, 9 - i, '#8ab070'); }
-  p.set(12, 3, '#e0ffd0');
-  p.rect(4, 9, 4, 1, '#5a3a6a'); p.rect(6, 8, 1, 4, '#5a3a6a');
+  for (let i = 0; i < 6; i++) { p.set(6 + i, 9 - i, blade); p.set(7 + i, 9 - i, shade(blade, -0.25)); }
+  p.set(12, 3, shade(blade, 0.15));
+  p.rect(4, 9, 4, 1, guard); p.rect(6, 8, 1, 4, guard);
   p.set(4, 12, '#3a2a1a'); p.set(5, 11, '#3a2a1a');
-  p.set(9, 6, '#7aff50');
+  p.set(9, 6, gem);
   return p.outline(OUT);
+}
+
+function iceCrystal() {
+  const p = new Pix(16, 16);
+  p.rect(6, 2, 4, 12, '#7ad8f8'); p.rect(7, 1, 2, 1, '#7ad8f8'); p.rect(7, 14, 2, 1, '#7ad8f8');
+  p.rect(3, 6, 3, 6, '#5ac0e8'); p.rect(10, 5, 3, 7, '#5ac0e8');
+  p.rect(7, 3, 1, 9, '#ffffff'); p.set(4, 7, '#d8f8ff'); p.set(11, 6, '#d8f8ff');
+  return p.outline('#1a4a6a');
+}
+
+function hydra(frame) {
+  const p = new Pix(32, 32);
+  const skin = '#4a9a4a', dark = '#2e6a3a', belly = '#c8d890', spine = '#8a4ab0';
+  // 몸통과 꼬리
+  p.ellipse(16, 23, 11, 7, skin);
+  p.ellipse(16, 25, 7, 4, belly);
+  p.rect(25, 24, 5, 3, skin); p.rect(28, 21, 2, 4, skin);
+  for (let x = 9; x < 24; x += 3) p.set(x, 16, spine);
+  // 목 세 개 (머리 위치는 프레임에 따라 살짝 흔들림)
+  const sway = frame === 0 ? 0 : 1;
+  const heads = [[7 - sway, 9], [16, 5 + sway], [25 + sway, 9]];
+  for (const [hx, hy] of heads) {
+    const steps = 8;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = Math.round(16 + (hx - 16) * t);
+      const y = Math.round(19 + (hy - 19) * t);
+      p.rect(x - 1, y, 3, 2, i % 2 ? skin : dark);
+    }
+  }
+  for (const [hx, hy] of heads) {
+    p.ellipse(hx + 0.5, hy, 3.6, 3, skin);
+    p.rect(hx - 2, hy + 2, 5, 1, dark);
+    p.set(hx - 1, hy - 1, '#ff3a3a'); p.set(hx + 2, hy - 1, '#ff3a3a');
+    p.set(hx - 1, hy + 3, '#ffffff'); p.set(hx + 2, hy + 3, '#ffffff');
+    p.set(hx, hy - 3, spine);
+  }
+  return p.outline('#102a14');
+}
+
+function puddle() {
+  const p = new Pix(24, 14);
+  p.ellipse(12, 7, 11.5, 6.5, '#3a8a2a');
+  p.ellipse(12, 7, 9, 4.6, '#5ac040');
+  p.ellipse(8, 5.5, 1.6, 1.2, '#b8ff90'); p.ellipse(16, 8.5, 1.3, 1, '#b8ff90'); p.set(13, 4, '#d8ffc0');
+  return p;
 }
 
 function spear() {
@@ -999,6 +1045,11 @@ export function buildTextures(scene) {
   addSheet(scene, 'icon_iron_armor', [armor('#9aa4b4')]);
   addSheet(scene, 'icon_frost_armor', [armor('#8ad8f8')]);
   addSheet(scene, 'icon_venom_dagger', [dagger()]);
+  addSheet(scene, 'icon_hydra_fang', [dagger('#e8f0d0', '#2e6a3a', '#ff3a3a')]);
+  addSheet(scene, 'icon_hero_armor', [armor('#f0c850')]);
+  addSheet(scene, 'icon_ice_crystal', [iceCrystal()]);
+  addSheet(scene, 'hydra', [hydra(0), hydra(1)]);
+  addSheet(scene, 'puddle', [puddle()]);
   addSheet(scene, 'icon_wind_spear', [spear()]);
   addSheet(scene, 'icon_frost_axe', [axe()]);
   addSheet(scene, 'icon_mana_potion', [potion('#3a7aff')]);
@@ -1025,7 +1076,7 @@ export function buildAnims(scene) {
   scene.anims.create({ key: 'mushroom-move', frames: [{ key: 'mushroom', frame: 0 }, { key: 'mushroom', frame: 1 }], frameRate: 6, repeat: -1 });
   scene.anims.create({ key: 'bat-move', frames: [{ key: 'bat', frame: 0 }, { key: 'bat', frame: 1 }], frameRate: 8, repeat: -1 });
   scene.anims.create({ key: 'boss-move', frames: [{ key: 'boss', frame: 0 }, { key: 'boss', frame: 1 }], frameRate: 4, repeat: -1 });
-  for (const [key, rate] of [['toad', 3], ['wisp', 6], ['wolf', 8], ['icespirit', 3], ['golem', 3], ['herb', 2]]) {
+  for (const [key, rate] of [['toad', 3], ['wisp', 6], ['wolf', 8], ['icespirit', 3], ['golem', 3], ['herb', 2], ['hydra', 3]]) {
     scene.anims.create({ key: `${key}-move`, frames: [{ key, frame: 0 }, { key, frame: 1 }], frameRate: rate, repeat: -1 });
   }
   scene.anims.create({ key: 'cat-move', frames: [{ key: 'cat', frame: 0 }, { key: 'cat', frame: 1 }], frameRate: 2, repeat: -1 });

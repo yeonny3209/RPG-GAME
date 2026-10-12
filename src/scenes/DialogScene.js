@@ -43,6 +43,10 @@ export class DialogScene extends Phaser.Scene {
       up: () => this.moveChoice(-1),
       down: () => this.moveChoice(1),
     });
+    // 마우스 클릭으로도 대화를 넘긴다
+    this.input.on('pointerdown', (ptr) => {
+      if (ptr.leftButtonDown() && this.game.loop.time >= this._readyAt) this.advance();
+    });
     this.showLine();
   }
 

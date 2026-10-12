@@ -75,6 +75,14 @@ export const MONSTERS = {
     drops: [],
   },
 
+  hydra: {
+    name: '독룡 히드라', ai: 'boss',
+    hp: 850, atk: 27, def: 10,
+    speed: 34, chaseSpeed: 34,
+    exp: 150, gold: [300, 300],
+    drops: [],
+  },
+
   boss: {
     name: '그림자 군주 모르그', ai: 'boss',
     hp: 900, atk: 26, def: 12,
