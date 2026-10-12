@@ -8,6 +8,10 @@ const BODY = {
   mushroom: [10, 8, 3, 7],
   bat: [10, 8, 3, 5],
   skeleton: [10, 7, 3, 9],
+  toad: [12, 8, 2, 7],
+  wisp: [10, 10, 3, 4],
+  wolf: [12, 7, 2, 8],
+  icespirit: [10, 10, 3, 4],
 };
 
 export class Monster extends Phaser.Physics.Arcade.Sprite {
@@ -103,13 +107,32 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
           this.setVelocity(0);
           break;
         }
-        if (ai === 'knight' && dist < 30) {
-          this.startWindup(500);
+        if (ai === 'knight' && dist < (d.lungeRange || 30)) {
+          this.startWindup(d.windup || 500);
           break;
+        }
+        if (ai === 'spitter' || ai === 'turret') {
+          // 너무 가까우면 뒤로 물러나고, 아니면 멈춰서 쏜다
+          if (ai === 'spitter' && dist < 40) this.setVelocity((-dx / dist) * d.chaseSpeed, (-dy / dist) * d.chaseSpeed);
+          else this.setVelocity(0);
+          if (this.nextShot === undefined) this.nextShot = time + 500;
+          if (time > this.nextShot) {
+            this.nextShot = time + (ai === 'turret' ? 2300 : 1700);
+            this.startWindup(ai === 'turret' ? 600 : 450);
+          }
+          break;
+        }
+        if (ai === 'blinker') {
+          if (this.nextBlink === undefined) this.nextBlink = time + 1500;
+          if (time > this.nextBlink) {
+            this.nextBlink = time + 3200 + Math.random() * 1500;
+            this.blink();
+            break;
+          }
         }
         let vx = (dx / dist) * d.chaseSpeed;
         let vy = (dy / dist) * d.chaseSpeed;
-        if (ai === 'flyer') {
+        if (ai === 'flyer' || ai === 'blinker') {
           const w = Math.sin(time / 140 + this.wobble) * 45;
           vx += (-dy / dist) * w;
           vy += (dx / dist) * w;
@@ -130,6 +153,11 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
         else this.clearTint();
         if (time > this.stateUntil) {
           this.clearTint();
+          if (ai === 'spitter' || ai === 'turret') {
+            this.shoot();
+            this.setState2('rest', 400);
+            break;
+          }
           const a = Phaser.Math.Angle.Between(this.x, this.y, this.target.x, this.target.y);
           this.setVelocity(Math.cos(a) * d.dashSpeed, Math.sin(a) * d.dashSpeed);
           sfx.dash();
@@ -176,6 +204,48 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  shoot() {
+    const d = this.stats;
+    if (d.ai === 'turret') {
+      // 십자(+)와 대각선(x) 방향을 번갈아 쏜다
+      this.volley = (this.volley || 0) + 1;
+      const off = this.volley % 2 ? 0 : Math.PI / 4;
+      for (let i = 0; i < 4; i++) this.scene.fireOrb(this.x, this.y, off + (i * Math.PI) / 2, d.shotSpeed, d.shotTex, d.atk);
+    } else {
+      const p = this.scene.player;
+      const a = Phaser.Math.Angle.Between(this.x, this.y, p.x, p.y);
+      this.scene.fireOrb(this.x, this.y + 2, a, d.shotSpeed, d.shotTex, d.atk);
+    }
+    sfx.orb();
+  }
+
+  // 사라졌다가 플레이어 근처(벽이 아닌 곳)에 다시 나타남
+  blink() {
+    this.setState2('blink');
+    this.setVelocity(0);
+    this.scene.tweens.add({
+      targets: this, alpha: 0, duration: 250,
+      onComplete: () => {
+        if (this.dead || !this.body) return;
+        const p = this.scene.player;
+        for (let i = 0; i < 8; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const r = 36 + Math.random() * 14;
+          const nx = Phaser.Math.Clamp(p.x + Math.cos(a) * r, 12, this.scene.mapW - 12);
+          const ny = Phaser.Math.Clamp(p.y + Math.sin(a) * r, 12, this.scene.mapH - 12);
+          if (!this.scene.top.getTileAtWorldXY(nx, ny)) {
+            this.body.reset(nx, ny);
+            break;
+          }
+        }
+        this.scene.tweens.add({
+          targets: this, alpha: 1, duration: 250,
+          onComplete: () => { if (!this.dead) this.setState2('rest', 350); },
+        });
+      },
+    });
+  }
+
   startWindup(ms) {
     const p = this.scene.player;
     this.target = { x: p.x, y: p.y };
@@ -194,6 +264,8 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
       this.play(`skeleton-${moving ? 'walk' : 'idle'}-${d}`, true);
     } else if (Math.abs(vx) > 1) {
       this.setFlipX(vx < 0);
+    } else if (this.kind === 'wolf') {
+      this.setFlipX(this.scene.player.x < this.x);
     }
   }
 
@@ -210,7 +282,8 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     }
     if (this.state === 'hidden') this.play('mushroom-move');
     const a = Phaser.Math.Angle.Between(fromX, fromY, this.x, this.y);
-    this.setVelocity(Math.cos(a) * 150, Math.sin(a) * 150);
+    const kb = this.stats.ai === 'turret' ? 0 : 150; // 얼음 정령은 밀려나지 않음
+    this.setVelocity(Math.cos(a) * kb, Math.sin(a) * kb);
     this.state = 'hurt';
     this.stateUntil = this.scene.time.now + 160;
     return true;

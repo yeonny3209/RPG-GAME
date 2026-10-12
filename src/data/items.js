@@ -45,6 +45,11 @@ export const ITEMS = {
     desc: '무겁지만 믿음직한 철 갑옷. 방어력 +9',
   },
 
+  frost_armor: {
+    name: '서리 갑옷', type: 'armor', def: 15, price: 500,
+    desc: '서리 골렘의 얼음으로 만든 갑옷. 방어력 +15',
+  },
+
   shadow_key: {
     name: '그림자 열쇠', type: 'key', price: 0,
     desc: '마왕의 방 문을 여는 검은 열쇠.',

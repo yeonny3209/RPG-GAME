@@ -109,6 +109,8 @@ export const LOOKS = {
   guard: { skin: '#eebd96', hair: '#a8b0c0', shirt: '#7088a8', pants: '#4a5468', shoes: '#2a2a3a', style: 'helmet' },
   wizard: { skin: '#eebd96', hair: '#c8c8d8', shirt: '#4a3a9a', pants: '#3a2a7a', shoes: '#2a2050', style: 'short', beard: '#dcdce8', hat: '#4a3a9a', pointy: true },
   skeleton: { skin: '#ebe5cf', hair: null, shirt: '#d6cfb3', pants: '#c4bc9e', shoes: '#8d8670', style: 'bald', ribs: true, eyes: '#3a0a0a' },
+  herbalist: { skin: '#e2b08a', hair: '#b8b8b0', shirt: '#5a7a3a', pants: '#4a5a2a', shoes: '#3a2a1a', style: 'long', hat: '#3e6a30', apron: '#8a7a50' },
+  climber: { skin: '#e8b890', hair: '#4a3020', shirt: '#c84a3a', pants: '#3a4a6a', shoes: '#3a2a1a', style: 'short', hat: '#3a6ac8' },
 };
 
 // dir: 0=아래, 1=위, 2=옆(오른쪽)  frame: 0=서기, 1/2=걷기
@@ -302,6 +304,143 @@ function boss(frame) {
   p.rect(23, 14, 3, 6, armor); p.rect(25, 19, 3, 3, armor);
   p.rect(6, 14, 3, 6, armor); p.rect(6, 20, 3, 2, armor);
   return p.outline('#0a0610');
+}
+
+function toad(frame) {
+  const p = new Pix(16, 16);
+  const c = '#6a8a3a', belly = '#c8c070';
+  const squash = frame === 1 ? 1 : 0;
+  p.ellipse(8, 10.5 + squash * 0.5, 6, 4.2 - squash * 0.6, c);
+  p.ellipse(8, 12, 4, 2, belly);
+  // 눈 (튀어나옴)
+  p.ellipse(5, 6.5 + squash, 2, 2, c); p.ellipse(11, 6.5 + squash, 2, 2, c);
+  p.set(5, 6 + squash, '#f0e060'); p.set(11, 6 + squash, '#f0e060');
+  p.set(5, 7 + squash, '#1a1a0a'); p.set(11, 7 + squash, '#1a1a0a');
+  // 점박이
+  p.set(4, 10, '#4a6a2a'); p.set(11, 9, '#4a6a2a'); p.set(9, 11, '#4a6a2a');
+  p.rect(6, 10, 4, 1, '#3a4a1a');
+  // 발
+  p.rect(2, 13, 2, 2, c); p.rect(12, 13, 2, 2, c);
+  return p.outline('#1e2a10');
+}
+
+function wisp(frame) {
+  const p = new Pix(16, 16);
+  const outer = '#5ab0e8', mid = '#a8e0ff', core = '#ffffff';
+  const sway = frame === 0 ? 0 : 1;
+  p.ellipse(8, 9.5, 4.5, 4.5, outer);
+  for (let y = 2; y < 8; y++) {
+    const half = Math.max(1, Math.floor((y - 1) * 0.6));
+    p.rect(8 - half + (y < 5 ? sway : 0), y, half * 2, 1, outer);
+  }
+  p.ellipse(8, 10, 3, 3, mid);
+  p.ellipse(8, 10.5, 1.6, 1.6, core);
+  p.set(6, 9, '#1a3a5a'); p.set(10, 9, '#1a3a5a');
+  return p.outline('#183048');
+}
+
+function wolf(frame) {
+  // 옆모습 (오른쪽을 봄)
+  const p = new Pix(16, 16);
+  const fur = '#e8eef4', shade2 = '#b8c4d4';
+  p.ellipse(7, 9, 5.5, 3, fur);
+  p.ellipse(12, 7, 3, 2.6, fur);
+  p.rect(13, 7, 3, 2, fur); p.set(15, 8, '#2a2a3a');
+  p.set(11, 4, fur); p.set(12, 3, fur); p.set(10, 4, fur);
+  p.set(12, 6, '#2a6ad0');
+  // 꼬리
+  p.rect(1, 6, 2, 2, fur); p.set(0, 5, fur);
+  // 다리
+  const a = frame === 0 ? 0 : 1;
+  p.rect(3 + a, 11, 2, 3, shade2); p.rect(9 - a, 11, 2, 3, shade2);
+  p.rect(5 - a, 11, 1, 3, fur); p.rect(11 + a, 11, 1, 3, fur);
+  p.rect(4, 10, 6, 1, shade2);
+  return p.outline('#2a3040');
+}
+
+function iceSpirit(frame) {
+  const p = new Pix(16, 16);
+  const c = '#7ad8f8', light = '#d8f8ff', dark = '#3a90c8';
+  const bob = frame === 0 ? 0 : 1;
+  // 다이아몬드 몸통
+  for (let y = 2; y < 14; y++) {
+    const d = y < 8 ? y - 2 : 13 - y;
+    p.rect(8 - d, y - bob, d * 2, 1, y < 8 ? light : c);
+  }
+  p.rect(7, 4 - bob, 1, 6, '#ffffff');
+  p.rect(5, 8 - bob, 1, 1, dark); p.rect(10, 8 - bob, 1, 1, dark);
+  // 주변을 도는 작은 조각
+  const orbit = frame === 0 ? [[1, 4], [14, 11]] : [[2, 11], [13, 4]];
+  for (const [x, y] of orbit) { p.set(x, y, c); p.set(x, y + 1, dark); }
+  return p.outline('#183850');
+}
+
+function golem(frame) {
+  const p = new Pix(32, 32);
+  const ice = '#9ad0f0', light = '#e0f6ff', dark = '#5a90c0', rock = '#6a7688';
+  const arm = frame === 0 ? 0 : 1;
+  // 다리
+  p.rect(9, 24, 6, 6, rock); p.rect(17, 24, 6, 6, rock);
+  p.rect(9, 24, 6, 1, dark); p.rect(17, 24, 6, 1, dark);
+  // 몸통
+  p.ellipse(16, 17, 10, 8.5, ice);
+  p.ellipse(13, 13, 5, 3.5, light);
+  p.rect(12, 20, 8, 1, dark); p.rect(14, 22, 4, 1, dark);
+  // 머리
+  p.rect(12, 3, 8, 7, rock); p.rect(13, 2, 6, 1, rock);
+  p.rect(13, 4, 6, 1, light);
+  p.rect(13, 6, 2, 2, '#40e0ff'); p.rect(17, 6, 2, 2, '#40e0ff');
+  // 얼음 뿔
+  p.rect(11, 0, 1, 3, light); p.rect(20, 0, 1, 3, light);
+  // 팔 (주먹)
+  p.rect(3, 12 + arm, 5, 9, ice); p.rect(2, 20 + arm, 7, 5, rock);
+  p.rect(24, 12 - arm, 5, 9, ice); p.rect(23, 20 - arm, 7, 5, rock);
+  p.rect(4, 13 + arm, 1, 5, light); p.rect(25, 13 - arm, 1, 5, light);
+  // 어깨 수정
+  p.rect(6, 9, 3, 3, '#40c0f0'); p.rect(23, 9, 3, 3, '#40c0f0');
+  p.set(7, 8, light); p.set(24, 8, light);
+  return p.outline('#102030');
+}
+
+function herb(frame) {
+  const p = new Pix(16, 16);
+  const leaf = '#3a8a4a', glow = frame === 0 ? '#c8f0ff' : '#ffffff';
+  p.rect(7, 8, 2, 6, leaf);
+  p.ellipse(5, 10, 2.5, 1.4, leaf); p.ellipse(11, 9, 2.5, 1.4, leaf);
+  p.ellipse(8, 5, 2.6, 2.6, '#7ad0ff');
+  p.ellipse(8, 5, 1.4, 1.4, glow);
+  p.set(4, 4, frame === 0 ? '#a8e8ff' : null); p.set(12, 3, frame === 1 ? '#a8e8ff' : null);
+  return p.outline('#143a2a');
+}
+
+function poison() {
+  const p = new Pix(8, 8);
+  p.ellipse(4, 4, 3.4, 3.4, '#6ad040');
+  p.ellipse(3.5, 3.5, 1.4, 1.4, '#c8ff90');
+  return p.outline('#1e4a10');
+}
+
+function shard() {
+  // 오른쪽을 향한 얼음 조각
+  const p = new Pix(10, 6);
+  p.rect(1, 2, 7, 2, '#a8e8ff');
+  p.rect(3, 1, 4, 4, '#a8e8ff');
+  p.rect(8, 2, 1, 2, '#ffffff'); p.set(9, 3, '#ffffff');
+  p.rect(3, 2, 4, 1, '#ffffff');
+  return p.outline('#2a6a9a');
+}
+
+function snowflake() {
+  const p = new Pix(3, 3);
+  p.set(1, 0, '#ffffff'); p.set(0, 1, '#ffffff'); p.set(1, 1, '#ffffff'); p.set(2, 1, '#ffffff'); p.set(1, 2, '#ffffff');
+  return p;
+}
+
+function firefly() {
+  const p = new Pix(3, 3);
+  p.set(1, 1, '#f8ffa0'); p.set(0, 1, 'rgba(200,255,120,0.5)'); p.set(2, 1, 'rgba(200,255,120,0.5)');
+  p.set(1, 0, 'rgba(200,255,120,0.5)'); p.set(1, 2, 'rgba(200,255,120,0.5)');
+  return p;
 }
 
 function cat(frame) {
@@ -660,12 +799,79 @@ function tile(index) {
       for (let i = 0; i < 256; i++) if (q.d[i]) p.d[i] = q.d[i];
       break;
     }
+    case 22: speck('#4a6a3a', ['#40603a', '#567a44', '#3a5432'], 26); break;
+    case 23: {
+      speck('#6a5a3a', ['#5e4e32', '#7a6a48', '#54462c'], 30);
+      p.ellipse(5, 11, 2.5, 1.2, '#5a4a2e'); p.ellipse(11, 4, 2, 1, '#5a4a2e');
+      break;
+    }
+    case 24: {
+      speck('#4a6a3a', ['#40603a', '#567a44'], 18);
+      const q = new Pix(16, 16);
+      const bark = '#5a4632';
+      q.rect(7, 4, 2, 12, bark); q.rect(6, 13, 4, 3, bark);
+      [[6, 7], [5, 6], [4, 5], [3, 5], [9, 9], [10, 8], [11, 7], [12, 6], [12, 5], [7, 3], [8, 2], [8, 1], [6, 2]].forEach(([x, y]) => q.set(x, y, bark));
+      q.set(7, 6, '#6e5a42'); q.set(7, 10, '#6e5a42');
+      q.outline('#1e1a14');
+      for (let i = 0; i < 256; i++) if (q.d[i]) p.d[i] = q.d[i];
+      break;
+    }
+    case 25: {
+      speck('#4a6a3a', ['#40603a', '#567a44'], 18);
+      const q = new Pix(16, 16);
+      for (let i = 0; i < 6; i++) {
+        const x = 2 + i * 2 + (i % 2);
+        const top = 3 + ((i * 5) % 4);
+        q.rect(x, top, 1, 15 - top, i % 2 ? '#7a9a4a' : '#6a8a3a');
+        if (i % 2 === 0) { q.rect(x, top - 2, 1, 3, '#8a6a3a'); }
+      }
+      q.outline('#1e2a14');
+      for (let i = 0; i < 256; i++) if (q.d[i]) p.d[i] = q.d[i];
+      break;
+    }
+    case 26: {
+      p.fill('#2e4a3e');
+      for (let i = 0; i < 3; i++) { const x = Math.floor(r() * 11), y = 3 + i * 5; p.rect(x, y, 5, 1, '#46685a'); }
+      p.set(r() * 16, r() * 16, '#7a9a6a');
+      p.ellipse(11, 11, 2.2, 1.4, '#4a8a4a'); p.set(11, 11, '#e080a0');
+      break;
+    }
+    case 27: speck('#e8eef6', ['#dce4f0', '#f4f8ff', '#d0dae8'], 22); break;
+    case 28: {
+      p.fill('#a8d4ec');
+      p.rect(2, 3, 5, 1, '#d8f0ff'); p.rect(9, 9, 4, 1, '#d8f0ff'); p.rect(4, 12, 2, 1, '#d8f0ff');
+      p.set(12, 3, '#ffffff'); p.set(3, 8, '#8ac0e0'); p.set(13, 13, '#8ac0e0');
+      break;
+    }
+    case 29: {
+      speck('#e8eef6', ['#dce4f0', '#f4f8ff'], 14);
+      const q = new Pix(16, 16);
+      q.rect(7, 12, 2, 4, '#6a4424');
+      for (let y = 1; y < 13; y++) {
+        const half = Math.min(6, 1 + Math.floor((y - 1) * 0.55) + ((y % 4 === 0) ? -1 : 0));
+        q.rect(8 - half, y, half * 2, 1, y % 4 === 1 ? '#f4f8ff' : '#2e6a4a');
+      }
+      q.set(8, 0, '#f4f8ff');
+      q.outline('#163028');
+      for (let i = 0; i < 256; i++) if (q.d[i]) p.d[i] = q.d[i];
+      break;
+    }
+    case 30: {
+      speck('#e8eef6', ['#dce4f0', '#f4f8ff'], 14);
+      const q = new Pix(16, 16);
+      q.ellipse(8, 9.5, 6.8, 5.6, '#8a96a8');
+      q.ellipse(7, 6.5, 5, 2.6, '#f4f8ff');
+      q.set(10, 11, '#6a7688'); q.set(11, 10, '#6a7688'); q.set(4, 10, '#6a7688');
+      q.outline('#2a3040');
+      for (let i = 0; i < 256; i++) if (q.d[i]) p.d[i] = q.d[i];
+      break;
+    }
     default: p.fill('#ff00ff');
   }
   return p;
 }
 
-const TILE_COUNT = 22;
+const TILE_COUNT = 31;
 
 function makeTileset(scene) {
   // 각 타일 둘레에 1픽셀씩 같은 색을 덧대어(extrude) 확대 시 틈이 보이지 않게 한다
@@ -697,6 +903,16 @@ export function buildTextures(scene) {
   addSheet(scene, 'bat', [bat(0), bat(1)]);
   addSheet(scene, 'boss', [boss(0), boss(1)]);
   addSheet(scene, 'cat', [cat(0), cat(1)]);
+  addSheet(scene, 'toad', [toad(0), toad(1)]);
+  addSheet(scene, 'wisp', [wisp(0), wisp(1)]);
+  addSheet(scene, 'wolf', [wolf(0), wolf(1)]);
+  addSheet(scene, 'icespirit', [iceSpirit(0), iceSpirit(1)]);
+  addSheet(scene, 'golem', [golem(0), golem(1)]);
+  addSheet(scene, 'herb', [herb(0), herb(1)]);
+  addSheet(scene, 'poison', [poison()]);
+  addSheet(scene, 'shard', [shard()]);
+  addSheet(scene, 'snowflake', [snowflake()]);
+  addSheet(scene, 'firefly', [firefly()]);
 
   addSheet(scene, 'chest', [chest(false), chest(true)]);
   addSheet(scene, 'rock', [rock()]);
@@ -722,6 +938,7 @@ export function buildTextures(scene) {
   addSheet(scene, 'icon_cloth', [armor('#d8d0b8')]);
   addSheet(scene, 'icon_leather_armor', [armor('#a06a3a')]);
   addSheet(scene, 'icon_iron_armor', [armor('#9aa4b4')]);
+  addSheet(scene, 'icon_frost_armor', [armor('#8ad8f8')]);
   addSheet(scene, 'icon_shadow_key', [keyIcon()]);
   addSheet(scene, 'icon_crown', [crown()]);
 }
@@ -743,5 +960,8 @@ export function buildAnims(scene) {
   scene.anims.create({ key: 'mushroom-move', frames: [{ key: 'mushroom', frame: 0 }, { key: 'mushroom', frame: 1 }], frameRate: 6, repeat: -1 });
   scene.anims.create({ key: 'bat-move', frames: [{ key: 'bat', frame: 0 }, { key: 'bat', frame: 1 }], frameRate: 8, repeat: -1 });
   scene.anims.create({ key: 'boss-move', frames: [{ key: 'boss', frame: 0 }, { key: 'boss', frame: 1 }], frameRate: 4, repeat: -1 });
+  for (const [key, rate] of [['toad', 3], ['wisp', 6], ['wolf', 8], ['icespirit', 3], ['golem', 3], ['herb', 2]]) {
+    scene.anims.create({ key: `${key}-move`, frames: [{ key, frame: 0 }, { key, frame: 1 }], frameRate: rate, repeat: -1 });
+  }
   scene.anims.create({ key: 'cat-move', frames: [{ key: 'cat', frame: 0 }, { key: 'cat', frame: 1 }], frameRate: 2, repeat: -1 });
 }

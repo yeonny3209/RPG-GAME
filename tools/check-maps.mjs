@@ -42,6 +42,8 @@ for (const [id, m] of Object.entries(MAPS)) {
     if (!near(c.x, c.y)) { ok = false; console.log(`${id}: chest ${c.id} unreachable`); }
   }
   for (const mo of m.monsters) if (!reach(mo.x, mo.y)) { ok = false; console.log(`${id}: monster ${mo.type} at ${mo.x},${mo.y} bad`); }
+  for (const hb of m.herbs || []) if (!near(hb.x, hb.y) || solid(hb.x, hb.y)) { ok = false; console.log(`${id}: herb ${hb.id} bad`); }
+  if (m.boss && !reach(Math.floor(m.boss.x + 0.5), Math.floor(m.boss.y))) { ok = false; console.log(`${id}: boss unreachable`); }
   for (const s of m.spikes || []) if (!reach(s.x, s.y)) { ok = false; console.log(`${id}: spike bad ${s.x},${s.y}`); }
   console.log(`${id}: ${w}x${h}, reachable tiles ${seen.size}`);
 }

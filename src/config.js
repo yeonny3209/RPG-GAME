@@ -19,7 +19,8 @@ export const PLAYER = {
   knockback: 150,
 };
 
-export const MAX_LEVEL = 10;
+export const MAX_LEVEL = 15;
+export const FROST_MIN_LEVEL = 5; // 서리 봉우리 입장 레벨
 export const INVENTORY_SIZE = 20;
 export const STACK_MAX = 99;
 export const INN_PRICE = 10;

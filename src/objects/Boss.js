@@ -1,24 +1,56 @@
-// 보스 「그림자 군주 모르그」
-// 1페이즈: 베기 돌진, 3방향 구슬, (가까이 붙으면) 충격파
-// 2페이즈 (HP 50% 이하): 빨라짐 + 순간이동 기습, 8방향 구슬, 슬라임 소환
+// 보스 (종류별 설정은 아래 BOSSES)
+// 「그림자 군주 모르그」
+//   1페이즈: 베기 돌진, 3방향 구슬, (가까이 붙으면) 충격파
+//   2페이즈 (HP 50% 이하): 빨라짐 + 순간이동 기습, 8방향 구슬, 슬라임 소환
+// 「서리 골렘」 (중간 보스)
+//   1페이즈: 몸통 박치기, 3방향 얼음 조각, (가까이 붙으면) 땅 내려치기
+//   2페이즈: 빨라짐 + 8방향 얼음 조각, 박치기 연속
 // 모든 공격 전에는 깜빡이는 예고 동작이 있다.
 
 import { Monster } from './Monster.js';
 import { sfx } from '../audio.js';
 import { bus } from '../state.js';
 
-const ROOM = { x1: 28, y1: 30, x2: 292, y2: 206 }; // 마왕의 방 안쪽 (픽셀)
+export const BOSSES = {
+  boss: {
+    room: { x1: 28, y1: 30, x2: 292, y2: 206 }, // 마왕의 방 안쪽 (픽셀)
+    shotTex: 'orb',
+    novaColor: 0xc070ff,
+    phase2Tint: 0xff9a9a,
+    flag: 'boss_defeated',
+    intro: 'bossIntro',
+    options(phase, dist, summons) {
+      if (phase === 1) return dist < 48 ? ['nova', 'nova', 'slash', 'orbs3'] : ['slash', 'orbs3', 'orbs3'];
+      const o = ['slash', 'orbs8', 'teleport', summons < 2 ? 'summon' : 'orbs3'];
+      if (dist < 48) o.push('nova', 'nova', 'nova');
+      return o;
+    },
+  },
+  golem: {
+    room: { x1: 188, y1: 60, x2: 452, y2: 180 }, // 서리 봉우리 투기장 안쪽 (픽셀)
+    shotTex: 'shard',
+    novaColor: 0x80e0ff,
+    phase2Tint: 0x9ad8ff,
+    flag: 'golem_defeated',
+    intro: 'golemIntro',
+    options(phase, dist) {
+      if (phase === 1) return dist < 52 ? ['nova', 'nova', 'slash'] : ['slash', 'orbs3', 'orbs3'];
+      return dist < 52 ? ['nova', 'nova', 'slash', 'orbs8'] : ['slash', 'slash', 'orbs8', 'orbs3'];
+    },
+  },
+};
 
 export class Boss extends Monster {
-  constructor(scene, x, y) {
-    super(scene, x, y, 'boss', 'boss');
+  constructor(scene, x, y, kind = 'boss') {
+    super(scene, x, y, kind, kind);
     this.isBoss = true;
+    this.cfg = BOSSES[kind];
     this.body.setSize(18, 14).setOffset(7, 16);
     this.state = 'sleep';
     this.phase = 1;
     this.mult = 1;
     this.pending = null;
-    this.play('boss-move');
+    this.play(`${kind}-move`);
   }
 
   playMove() {}
@@ -85,7 +117,7 @@ export class Boss extends Monster {
   }
 
   applyBaseTint() {
-    if (this.phase === 2) this.setTint(0xff9a9a);
+    if (this.phase === 2) this.setTint(this.cfg.phase2Tint);
     else this.clearTint();
   }
 
@@ -107,14 +139,8 @@ export class Boss extends Monster {
   }
 
   chooseAttack(dist) {
-    let options;
-    if (this.phase === 1) {
-      options = dist < 48 ? ['nova', 'nova', 'slash', 'orbs3'] : ['slash', 'orbs3', 'orbs3'];
-    } else {
-      const summons = this.scene.monsters.getChildren().filter((m) => m.summoned && !m.dead).length;
-      options = ['slash', 'orbs8', 'teleport', summons < 2 ? 'summon' : 'orbs3'];
-      if (dist < 48) options.push('nova', 'nova', 'nova');
-    }
+    const summons = this.scene.monsters.getChildren().filter((m) => m.summoned && !m.dead).length;
+    const options = this.cfg.options(this.phase, dist, summons);
     const pick = Phaser.Utils.Array.GetRandom(options);
     if (pick === 'teleport') return this.teleport();
     this.pending = pick;
@@ -134,16 +160,16 @@ export class Boss extends Monster {
         this.stateUntil = this.scene.time.now + 320;
         break;
       case 'orbs3':
-        [-0.35, 0, 0.35].forEach((o) => this.scene.fireOrb(this.x, this.y + 6, a + o, 105));
+        [-0.35, 0, 0.35].forEach((o) => this.scene.fireOrb(this.x, this.y + 6, a + o, 105, this.cfg.shotTex, Math.round(this.stats.atk * 0.7)));
         sfx.orb();
         this.recover(600);
         break;
       case 'orbs8':
-        for (let i = 0; i < 8; i++) this.scene.fireOrb(this.x, this.y + 6, (i * Math.PI) / 4, 95);
+        for (let i = 0; i < 8; i++) this.scene.fireOrb(this.x, this.y + 6, (i * Math.PI) / 4, 95, this.cfg.shotTex, Math.round(this.stats.atk * 0.7));
         sfx.orb();
         this.scene.time.delayedCall(380, () => {
           if (this.dead) return;
-          for (let i = 0; i < 8; i++) this.scene.fireOrb(this.x, this.y + 6, (i * Math.PI) / 4 + Math.PI / 8, 95);
+          for (let i = 0; i < 8; i++) this.scene.fireOrb(this.x, this.y + 6, (i * Math.PI) / 4 + Math.PI / 8, 95, this.cfg.shotTex, Math.round(this.stats.atk * 0.7));
           sfx.orb();
         });
         this.recover(900);
@@ -155,7 +181,7 @@ export class Boss extends Monster {
       case 'summon':
         sfx.roar();
         [-22, 22].forEach((ox) => {
-          const m = this.scene.spawnMonster('slime', Phaser.Math.Clamp(this.x + ox, ROOM.x1, ROOM.x2), Phaser.Math.Clamp(this.y + 14, ROOM.y1, ROOM.y2));
+          const m = this.scene.spawnMonster('slime', Phaser.Math.Clamp(this.x + ox, this.cfg.room.x1, this.cfg.room.x2), Phaser.Math.Clamp(this.y + 14, this.cfg.room.y1, this.cfg.room.y2));
           m.summoned = true;
           m.setState2('chase');
           m.setAlpha(0);
@@ -178,8 +204,8 @@ export class Boss extends Monster {
         const p = this.scene.player;
         const ang = Math.random() * Math.PI * 2;
         this.body.reset(
-          Phaser.Math.Clamp(p.x + Math.cos(ang) * 52, ROOM.x1, ROOM.x2),
-          Phaser.Math.Clamp(p.y + Math.sin(ang) * 52, ROOM.y1, ROOM.y2),
+          Phaser.Math.Clamp(p.x + Math.cos(ang) * 52, this.cfg.room.x1, this.cfg.room.x2),
+          Phaser.Math.Clamp(p.y + Math.sin(ang) * 52, this.cfg.room.y1, this.cfg.room.y2),
         );
         this.scene.tweens.add({
           targets: this, alpha: 1, duration: 200,

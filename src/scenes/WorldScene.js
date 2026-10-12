@@ -1,6 +1,6 @@
 // 실제 게임 플레이 화면: 맵, 주인공, 몬스터, NPC, 상자, 출구
 
-import { TILE, ZOOM, FONT, DEBUG, INN_PRICE } from '../config.js';
+import { TILE, ZOOM, FONT, DEBUG, INN_PRICE, FROST_MIN_LEVEL } from '../config.js';
 import { MAPS, LEGEND, T } from '../data/maps.js';
 import { ITEMS } from '../data/items.js';
 import { talk, NARRATION } from '../data/story.js';
@@ -12,7 +12,7 @@ import { sfx, playMusic, stopMusic, toggleMute } from '../audio.js';
 import { josa } from '../ui.js';
 import { Player, DIR } from '../objects/Player.js';
 import { Monster } from '../objects/Monster.js';
-import { Boss } from '../objects/Boss.js';
+import { Boss, BOSSES } from '../objects/Boss.js';
 import { NPC } from '../objects/NPC.js';
 
 const tileCenter = (t) => (t + 0.5) * TILE;
@@ -76,7 +76,7 @@ export class WorldScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.monsters, (p, m) => this.onTouchMonster(m));
     this.physics.add.overlap(this.player, this.pickups, (p, it) => this.collect(it));
     this.physics.add.overlap(this.player, this.orbs, (p, o) => {
-      if (this.player.hurt(calcDamage(Math.round(26 * 0.7), def()), o.x, o.y)) o.destroy();
+      if (this.player.hurt(calcDamage(o.dmg, def()), o.x, o.y)) o.destroy();
     });
     this.physics.add.collider(this.orbs, this.top, (o) => o.destroy());
 
@@ -86,10 +86,12 @@ export class WorldScene extends Phaser.Scene {
     cam.setBounds(0, 0, this.mapW, this.mapH);
     cam.startFollow(this.player, true, 0.2, 0.2);
     cam.setRoundPixels(true);
-    cam.setBackgroundColor(this.mapId === 'cave' || this.mapId === 'throne' ? '#120e1a' : '#2a5a2a');
+    const BG = { cave: '#120e1a', throne: '#120e1a', swamp: '#2a3a2a', frost: '#c8d4e0' };
+    cam.setBackgroundColor(BG[this.mapId] || '#2a5a2a');
     cam.fadeIn(300, 0, 0, 0);
 
     this.setupInput();
+    this.createParticles();
 
     if (!this.scene.isActive('UI')) this.scene.launch('UI');
     this.time.delayedCall(50, () => bus.emit('mapEnter', mapDef.name));
@@ -184,12 +186,41 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (d.boss) {
-      if (!f.boss_defeated) {
-        this.boss = new Boss(this, tileCenter(d.boss.x), tileCenter(d.boss.y));
+      const kind = d.boss.kind;
+      if (!f[BOSSES[kind].flag]) {
+        this.boss = new Boss(this, tileCenter(d.boss.x), tileCenter(d.boss.y), kind);
         this.monsters.add(this.boss);
-      } else if (!f.crown) {
+      } else if (kind === 'boss' && !f.crown) {
         this.spawnCrown(tileCenter(d.boss.x), tileCenter(d.boss.y) + 8);
       }
+    }
+
+    for (const hb of d.herbs || []) {
+      if (f[hb.id]) continue;
+      const img = this.add.sprite(tileCenter(hb.x), tileCenter(hb.y), 'herb', 0).setDepth(tileCenter(hb.y));
+      img.play('herb-move');
+      img.herbId = hb.id;
+      this.interactables.push({ kind: 'herb', obj: img, r: 14 });
+    }
+  }
+
+  // 날씨 효과: 눈 / 반딧불
+  createParticles() {
+    const kind = this.mapDef.particles;
+    if (!kind) return;
+    if (kind === 'snow') {
+      this.add.particles(0, 0, 'snowflake', {
+        x: { min: 0, max: this.mapW }, y: -4,
+        lifespan: 12000, speedY: { min: 14, max: 26 }, speedX: { min: -8, max: 4 },
+        alpha: { start: 0.9, end: 0.4 }, quantity: 2, frequency: 90,
+      }).setDepth(9800);
+    } else if (kind === 'fireflies') {
+      this.add.particles(0, 0, 'firefly', {
+        x: { min: 0, max: this.mapW }, y: { min: 0, max: this.mapH },
+        lifespan: 4000, speedX: { min: -6, max: 6 }, speedY: { min: -6, max: 6 },
+        alpha: { values: [0, 1, 0] },
+        quantity: 1, frequency: 120,
+      }).setDepth(9800);
     }
   }
 
@@ -236,7 +267,7 @@ export class WorldScene extends Phaser.Scene {
       kb.on('keydown-N', () => { this.godMode = !this.godMode; this.toast('[디버그] 무적 ' + (this.godMode ? '켜짐' : '꺼짐')); });
       kb.on('keydown-H', () => { G.hp = maxHp(); });
       kb.on('keydown-T', () => {
-        const order = ['village', 'forest', 'cave', 'throne'];
+        const order = ['village', 'forest', 'swamp', 'cave', 'throne', 'frost'];
         const next = order[(order.indexOf(this.mapId) + 1) % order.length];
         this.changeMap(next, Object.keys(MAPS[next].spawns)[0]);
       });
@@ -269,7 +300,7 @@ export class WorldScene extends Phaser.Scene {
 
     // 상호작용 안내
     const t = this.canAct() ? this.findInteractable() : null;
-    const hint = t ? (t.kind === 'npc' ? 'E  말 걸기' : t.kind === 'chest' ? 'E  상자 열기' : 'E  조사하기') : null;
+    const hint = t ? (t.kind === 'npc' ? 'E  말 걸기' : t.kind === 'chest' ? 'E  상자 열기' : t.kind === 'herb' ? 'E  살펴보기' : 'E  조사하기') : null;
     if (hint !== this.lastHint) {
       this.lastHint = hint;
       bus.emit('hint', hint);
@@ -299,17 +330,24 @@ export class WorldScene extends Phaser.Scene {
   }
 
   onTouchMonster(m) {
-    if (m.dead || m.state === 'hidden' || m.state === 'sleep' || m.state === 'intro') return;
+    if (m.dead || ['hidden', 'sleep', 'intro', 'blink'].includes(m.state)) return;
     this.player.hurt(calcDamage(m.stats.atk, def()), m.x, m.y);
   }
 
-  fireOrb(x, y, angle, speed) {
-    const o = this.orbs.create(x, y, 'orb', 0);
-    o.body.setCircle(3, 2, 2);
+  // 발사체 (보스 구슬, 독 침, 얼음 조각). dmg 는 공격력 값
+  fireOrb(x, y, angle, speed, tex = 'orb', dmg = 18) {
+    const o = this.orbs.create(x, y, tex, 0);
+    o.dmg = dmg;
+    if (tex === 'shard') {
+      o.body.setSize(6, 4);
+      o.setRotation(angle);
+    } else {
+      o.body.setCircle(3, tex === 'orb' ? 2 : 1, tex === 'orb' ? 2 : 1);
+      this.tweens.add({ targets: o, angle: 360, duration: 600, repeat: -1 });
+    }
     o.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
     o.setDepth(9000);
     this.time.delayedCall(4000, () => { if (o.active) o.destroy(); });
-    this.tweens.add({ targets: o, angle: 360, duration: 600, repeat: -1 });
     return o;
   }
 
@@ -371,7 +409,7 @@ export class WorldScene extends Phaser.Scene {
   bossWake(boss) {
     this.player.stop();
     stopMusic();
-    this.say(NARRATION.bossIntro, () => {
+    this.say(NARRATION[boss.cfg.intro], () => {
       boss.state = 'chase';
       boss.stateUntil = this.time.now + 1200;
       this.bossActive = true;
@@ -389,14 +427,16 @@ export class WorldScene extends Phaser.Scene {
     const R = 46;
     sfx.dash();
     this.cameras.main.shake(150, 0.004);
-    const ring = this.add.circle(cx, cy, 6).setStrokeStyle(2, 0xc070ff, 1).setFillStyle(0x8040ff, 0.25).setDepth(9000);
+    const col = b.cfg.novaColor;
+    const ring = this.add.circle(cx, cy, 6).setStrokeStyle(2, col, 1).setFillStyle(col, 0.25).setDepth(9000);
     this.tweens.add({ targets: ring, scale: R / 6, alpha: 0, duration: 320, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
     if (Phaser.Math.Distance.Between(cx, cy, this.player.x, this.player.footY) < R) {
-      this.player.hurt(calcDamage(30, def()), cx, cy);
+      this.player.hurt(calcDamage(b.stats.atk + 4, def()), cx, cy);
     }
   }
 
   onBossDefeated(boss) {
+    if (boss.kind === 'golem') return this.onGolemDefeated(boss);
     G.flags.boss_defeated = true;
     this.bossActive = false;
     bus.emit('boss', { show: false });
@@ -412,6 +452,31 @@ export class WorldScene extends Phaser.Scene {
       this.dropCoin(boss.x - 10, boss.y + 6, boss.stats.gold[0]);
       this.spawnCrown(boss.x, boss.y + 6);
       sfx.chest();
+    });
+  }
+
+  onGolemDefeated(boss) {
+    G.flags.golem_defeated = true;
+    this.bossActive = false;
+    bus.emit('boss', { show: false });
+    stopMusic();
+    sfx.bossDie();
+    this.cameras.main.shake(900, 0.008);
+    this.cameras.main.flash(400, 200, 240, 255);
+    for (const o of this.orbs.getChildren().slice()) o.destroy();
+    this.floatText(boss.x, boss.y - 20, `+${boss.stats.exp} EXP`, '#9ad8ff', 9);
+    this.gainExp(boss.stats.exp);
+    if (questState('golem') === 'active') {
+      G.quests.golem = 'ready';
+      this.toast('서리 골렘을 쓰러뜨렸다! 마을의 등산가에게 알리자.');
+    } else {
+      this.toast('서리 골렘을 쓰러뜨렸다!');
+    }
+    this.time.delayedCall(1700, () => {
+      this.dropCoin(boss.x - 10, boss.y + 6, boss.stats.gold[0]);
+      this.dropItem('frost_armor', boss.x + 8, boss.y + 6);
+      sfx.chest();
+      playMusic(this.mapDef.bgm);
     });
   }
 
@@ -518,6 +583,27 @@ export class WorldScene extends Phaser.Scene {
       this.openChest(t);
     } else if (t.kind === 'door') {
       this.openDoor(t);
+    } else if (t.kind === 'herb') {
+      this.pickHerb(t);
+    }
+  }
+
+  pickHerb(t) {
+    if (questState('herb') !== 'active') {
+      this.say(NARRATION.herbIdle);
+      return;
+    }
+    const img = t.obj;
+    G.flags[img.herbId] = true;
+    this.interactables = this.interactables.filter((x) => x !== t);
+    G.progress.herb = (G.progress.herb || 0) + 1;
+    sfx.item();
+    this.tweens.add({ targets: img, y: img.y - 10, alpha: 0, duration: 500, onComplete: () => img.destroy() });
+    if (G.progress.herb >= 3) {
+      G.quests.herb = 'ready';
+      this.toast('달빛 풀을 모두 모았다! 약초꾼 할머니에게 돌아가자.');
+    } else {
+      this.toast(`달빛 풀을 캤다! (${G.progress.herb}/3)`);
     }
   }
 
@@ -712,9 +798,13 @@ export class WorldScene extends Phaser.Scene {
   onExit(e) {
     if (this.transitioning || this.player.dead) return;
     if (e.gate === 'guard' && questState('main') === 'none') {
-      this.player.setPosition(this.player.x, this.player.y + 12);
-      this.player.body.reset(this.player.x, this.player.y);
+      this.player.body.reset(this.player.x, this.player.y + 12);
       this.say(NARRATION.guardBlock);
+      return;
+    }
+    if (e.gate === 'level' && G.level < FROST_MIN_LEVEL) {
+      this.player.body.reset(this.player.x - 12, this.player.y);
+      this.say(NARRATION.frostBlock(G.level));
       return;
     }
     this.changeMap(e.to, e.spawn);

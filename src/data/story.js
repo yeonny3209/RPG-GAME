@@ -3,6 +3,7 @@
 // w 는 WorldScene (상점 열기, 아이템 주기 등의 기능을 가지고 있다).
 
 import { G, questState, startQuest, addItem, equipIfBetter } from '../state.js';
+import { FROST_MIN_LEVEL } from '../config.js';
 
 export const PLAYER_NAME = '리오';
 
@@ -17,12 +18,16 @@ export const NPCS = {
   wizard: { name: '은둔 마법사 엘든', look: 'wizard' },
   cat: { name: '나비', look: 'cat' },
   cat_home: { name: '나비', look: 'cat' },
+  herbalist: { name: '약초꾼 할머니', look: 'herbalist' },
+  climber: { name: '등산가 바위', look: 'climber' },
 };
 
 export const QUESTS = {
   main: { title: '빛의 왕관을 찾아서', main: true },
   slime: { title: '슬라임 퇴치', goal: 5 },
   cat: { title: '잃어버린 고양이' },
+  herb: { title: '늪의 달빛 풀', goal: 3 },
+  golem: { title: '서리 봉우리의 골렘' },
 };
 
 // 지금 해야 할 일 (화면 오른쪽 위에 표시)
@@ -49,6 +54,16 @@ export function objective(id) {
     if (st === 'active') return f.cat_found ? '토토에게 돌아가자' : '숲 동쪽 덤불에서 나비 찾기';
     return null;
   }
+  if (id === 'herb') {
+    if (st === 'active') return `안개 늪의 달빛 풀 ${G.progress.herb || 0}/3`;
+    if (st === 'ready') return '약초꾼 할머니에게 돌아가자';
+    return null;
+  }
+  if (id === 'golem') {
+    if (st === 'active') return '서리 봉우리 꼭대기의 골렘을 쓰러뜨리자';
+    if (st === 'ready') return '마을의 등산가에게 알리자';
+    return null;
+  }
   return null;
 }
 
@@ -69,6 +84,15 @@ export function marker(id) {
       return st === 'none' ? '!' : st === 'ready' ? '?' : null;
     }
     case 'cat': return questState('cat') === 'active' ? '?' : null;
+    case 'herbalist': {
+      const st = questState('herb');
+      return st === 'none' ? '!' : st === 'ready' ? '?' : null;
+    }
+    case 'climber': {
+      const st = questState('golem');
+      if (st === 'none') return f.golem_defeated ? '?' : '!';
+      return st === 'ready' ? '?' : null;
+    }
     default: return null;
   }
 }
@@ -243,6 +267,92 @@ export function talk(id, w) {
     case 'cat_home':
       return { lines: [L('나비', '야옹~ (만족스러워 보인다)')] };
 
+    case 'herbalist': {
+      const H = '약초꾼 할머니';
+      const st = questState('herb');
+      if (st === 'none') {
+        return {
+          lines: [
+            L(H, '어이쿠, 이런 늪까지 손님이 다 오고… 별일이구먼.'),
+            L(H, '요즘 늪 기운이 이상해서 약을 만들려면 「달빛 풀」이 필요한데…'),
+            L(H, '독두꺼비랑 도깨비불 때문에 이 늙은이는 캐러 갈 수가 없어.'),
+            L(H, '늪 어딘가에 푸르게 빛나는 풀이 세 포기 있을 게야. 좀 캐다 주겠니?'),
+          ],
+          onDone: () => { startQuest('herb'); w.toast('퀘스트 시작: 늪의 달빛 풀'); },
+        };
+      }
+      if (st === 'active') {
+        return {
+          lines: [
+            L(H, `달빛 풀은 ${G.progress.herb || 0}포기 모았구먼. 세 포기면 된단다.`),
+            L(H, '독두꺼비는 멀리서 독을 뱉으니 옆으로 피하고, 도깨비불은 갑자기 나타나니 조심하렴.'),
+          ],
+        };
+      }
+      if (st === 'ready') {
+        return {
+          lines: [
+            L(H, '오오, 정말 다 캐 왔구나! 고맙다, 고마워.'),
+            L(H, '이걸로 만든 약이란다. 그리고 얼마 안 되지만 이것도 받아 두렴.'),
+          ],
+          onDone: () => {
+            G.quests.herb = 'done';
+            G.gold += 100;
+            addItem('big_potion', 3);
+            w.itemGot('big_potion', 3, '100골드와 큰 빨간 포션 3개를 받았다!');
+            w.toast('퀘스트 완료: 늪의 달빛 풀');
+          },
+        };
+      }
+      return { lines: [L(H, '네 덕분에 약을 잔뜩 만들었단다. 몸조심하거라.')] };
+    }
+
+    case 'climber': {
+      const C = '바위';
+      const st = questState('golem');
+      if (st === 'none' && f.golem_defeated) {
+        return {
+          lines: [L(C, '뭐? 벌써 서리 골렘을 쓰러뜨렸다고?!'), L(C, '대단한데! 약속한 건 아니지만 이건 꼭 받아 줘.')],
+          onDone: () => {
+            G.quests.golem = 'done';
+            G.gold += 300;
+            w.itemGot('big_potion', 0, '300골드를 받았다!');
+          },
+        };
+      }
+      if (st === 'none') {
+        return {
+          lines: [
+            L(C, '안녕! 나는 등산가 바위야. 동쪽 길로 가면 「서리 봉우리」가 나와.'),
+            L(C, '그런데 꼭대기에 「서리 골렘」이 나타나서 아무도 올라가질 못해.'),
+            L(C, `엄청 위험한 곳이라 레벨 ${FROST_MIN_LEVEL}은 되어야 들여보내 줄 수 있어.`),
+            L(C, '골렘을 쓰러뜨려 준다면 보답은 두둑이 할게!'),
+          ],
+          onDone: () => { startQuest('golem'); w.toast('퀘스트 시작: 서리 봉우리의 골렘'); },
+        };
+      }
+      if (st === 'active') {
+        return {
+          lines: [
+            L(C, '골렘은 몸을 번쩍이다가 땅을 내려쳐. 그때는 멀리 떨어져!'),
+            L(C, '늑대는 무리 지어 다니니까 한 마리씩 상대하는 게 좋아.'),
+          ],
+        };
+      }
+      if (st === 'ready') {
+        return {
+          lines: [L(C, '봉우리에서 우렁찬 소리가 들리더니… 정말 해냈구나!'), L(C, '약속한 보답이야. 이제 다시 산에 오를 수 있겠어!')],
+          onDone: () => {
+            G.quests.golem = 'done';
+            G.gold += 300;
+            w.itemGot('big_potion', 0, '300골드를 받았다!');
+            w.toast('퀘스트 완료: 서리 봉우리의 골렘');
+          },
+        };
+      }
+      return { lines: [L(C, '오늘은 날씨가 좋아서 봉우리 경치가 끝내줄 거야!')] };
+    }
+
     default:
       return { lines: [L('???', '…')] };
   }
@@ -266,4 +376,13 @@ export const NARRATION = {
   doorLocked: [L('', '거대한 문이 굳게 잠겨 있다.'), L(PLAYER_NAME, '(어딘가에 열쇠가 있을 것 같아.)')],
   doorOpen: [L('', '그림자 열쇠를 사용했다! 문이 열린다…')],
   guardBlock: [L('경비병', '잠깐! 숲은 위험해. 촌장님께 먼저 인사드리고 가렴.')],
+  frostBlock: (lv) => [
+    L('바위', `잠깐! 서리 봉우리는 정말 위험해. 레벨 ${FROST_MIN_LEVEL}은 되어야 해. (지금 레벨 ${lv})`),
+    L('바위', '숲이나 안개 늪에서 조금 더 강해지고 와!'),
+  ],
+  golemIntro: [
+    L('', '쿠오오오오…'),
+    L('', '(얼음 바위가 움직이기 시작했다! 서리 골렘이 깨어났다!)'),
+  ],
+  herbIdle: [L(PLAYER_NAME, '(은은하게 푸른빛이 나는 풀이다. 누군가 필요로 할지도…)')],
 };

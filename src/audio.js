@@ -138,6 +138,18 @@ const TRACKS = {
     bass: 'D2 . . . D2 . . . D2 . . . D2 . . . A#1 . . . A#1 . . . A#1 . . . A#1 . . . C2 . . . C2 . . . A1 . . . A1 . . . D2 . . . D2 . . . D2 . . . D2 . . .',
     leadType: 'triangle',
   },
+  swamp: {
+    bpm: 96,
+    lead: 'E4 . . G4 . . A4 . B4 . . . A4 . G4 . E4 . . D4 . . E4 . . . . . . . . . G4 . . A4 . . B4 . D5 . . . B4 . A4 . G4 . . A4 . . F#4 . E4 . . . . . . .',
+    bass: 'E2 . . . B2 . . . E2 . . . B2 . . . C2 . . . G2 . . . D2 . . . A2 . . . E2 . . . B2 . . . E2 . . . B2 . . . C2 . . . G2 . . . B1 . . . F#2 . . .',
+    leadType: 'triangle',
+  },
+  frost: {
+    bpm: 104,
+    lead: 'B5 . F#5 . D5 . F#5 . B5 . . . A5 . . . G5 . E5 . B4 . E5 . G5 . . . F#5 . . . D5 . F#5 . A5 . D6 . C#6 . . . A5 . . . B5 . A5 . F#5 . E5 . F#5 . . . . . . .',
+    bass: 'B2 . . . F#2 . . . G2 . . . D2 . . . E2 . . . B2 . . . F#2 . . . C#3 . . . D2 . . . A2 . . . G2 . . . D2 . . . E2 . . . F#2 . . . B2 . . . B2 . . .',
+    leadType: 'triangle',
+  },
   boss: {
     bpm: 156,
     lead: 'E5 . E5 G5 . E5 D5 . E5 . B4 . D5 . . . E5 . E5 G5 . A5 G5 . F#5 . D5 . E5 . . . G5 . G5 A5 . G5 F#5 . E5 . C5 . D5 . . . B4 . C5 D5 . E5 F#5 . G5 . F#5 . E5 . . .',
