@@ -1,0 +1,114 @@
+// 주인공 리오: 이동, 공격, 피격
+
+import { PLAYER } from '../config.js';
+import { G } from '../state.js';
+import { sfx } from '../audio.js';
+
+export const DIR = {
+  down: { x: 0, y: 1 },
+  up: { x: 0, y: -1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+};
+
+const SLASH_ANGLE = { right: 0, down: 90, left: 180, up: -90 };
+
+export class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player', 0);
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+    this.body.setSize(10, 7).setOffset(3, 9);
+    this.setCollideWorldBounds(true);
+    this.facing = 'down';
+    this.attackUntil = 0;
+    this.nextAttack = 0;
+    this.invulnUntil = 0;
+    this.knockUntil = 0;
+    this.dead = false;
+    this.play('player-idle-down');
+  }
+
+  // 발 위치 (상호작용·충돌 판정 기준점)
+  get footY() {
+    return this.y + 4;
+  }
+
+  move(ix, iy, time) {
+    if (this.dead) return;
+    if (time < this.knockUntil) return;
+    if (time < this.attackUntil) {
+      this.setVelocity(0);
+      return;
+    }
+    if (ix || iy) {
+      const len = Math.hypot(ix, iy);
+      this.setVelocity((ix / len) * PLAYER.speed, (iy / len) * PLAYER.speed);
+      // 바라보는 방향: 마지막으로 누른 축 우선, 대각선이면 가로 우선
+      if (ix && !iy) this.facing = ix > 0 ? 'right' : 'left';
+      else if (iy && !ix) this.facing = iy > 0 ? 'down' : 'up';
+      else if (!(DIR[this.facing].x === Math.sign(ix) || DIR[this.facing].y === Math.sign(iy))) {
+        this.facing = ix > 0 ? 'right' : 'left';
+      }
+      this.anim('walk');
+    } else {
+      this.setVelocity(0);
+      this.anim('idle');
+    }
+  }
+
+  anim(kind) {
+    const d = this.facing === 'left' || this.facing === 'right' ? 'side' : this.facing;
+    this.setFlipX(this.facing === 'left');
+    this.play(`player-${kind}-${d}`, true);
+  }
+
+  stop() {
+    this.setVelocity(0);
+    if (!this.dead) this.anim('idle');
+  }
+
+  // 공격 시작. 성공하면 칼이 닿는 범위(사각형)를 돌려준다.
+  tryAttack(time) {
+    if (this.dead || time < this.nextAttack || time < this.knockUntil) return null;
+    this.nextAttack = time + PLAYER.attackCooldown;
+    this.attackUntil = time + PLAYER.attackDuration;
+    this.setVelocity(0);
+    this.anim('idle');
+    sfx.swing();
+
+    const v = DIR[this.facing];
+    const fx = this.x + v.x * 11;
+    const fy = this.y + 3 + v.y * 11;
+    const s = this.scene.add.image(fx, fy, 'slash', 0)
+      .setAngle(SLASH_ANGLE[this.facing])
+      .setDepth(this.y + 30)
+      .setScale(0.85);
+    this.scene.tweens.add({
+      targets: s, alpha: 0, scale: 1.1, duration: 200, ease: 'Quad.easeOut',
+      onComplete: () => s.destroy(),
+    });
+    return new Phaser.Geom.Rectangle(fx - 11, fy - 11, 22, 22);
+  }
+
+  hurt(dmg, fromX, fromY) {
+    const now = this.scene.time.now;
+    if (this.dead || now < this.invulnUntil || this.scene.godMode) return false;
+    G.hp = Math.max(0, G.hp - dmg);
+    this.invulnUntil = now + PLAYER.invuln;
+    this.knockUntil = now + 150;
+    const a = Phaser.Math.Angle.Between(fromX, fromY, this.x, this.y);
+    this.setVelocity(Math.cos(a) * PLAYER.knockback, Math.sin(a) * PLAYER.knockback);
+    sfx.hurt();
+    this.scene.floatText(this.x, this.y - 10, '-' + dmg, '#ff6a6a');
+    this.scene.cameras.main.shake(120, 0.004);
+    this.setTintFill(0xffffff);
+    this.scene.time.delayedCall(80, () => this.clearTint());
+    this.scene.tweens.add({
+      targets: this, alpha: 0.3, duration: 90, yoyo: true, repeat: Math.floor(PLAYER.invuln / 180) - 1,
+      onComplete: () => this.setAlpha(1),
+    });
+    if (G.hp <= 0) this.scene.onPlayerDeath();
+    return true;
+  }
+}
