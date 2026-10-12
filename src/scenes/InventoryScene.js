@@ -2,7 +2,7 @@
 
 import { GAME_W, GAME_H, INVENTORY_SIZE } from '../config.js';
 import { ITEMS } from '../data/items.js';
-import { G, maxHp, atk, def, nextExp, equipFromSlot } from '../state.js';
+import { G, maxHp, maxMp, atk, def, nextExp, equipFromSlot } from '../state.js';
 import { text, panel, icon, bindMenuKeys, COLORS, josa } from '../ui.js';
 import { sfx } from '../audio.js';
 
@@ -68,7 +68,10 @@ export class InventoryScene extends Phaser.Scene {
         W.useFeather();
         return;
       }
-      if (W.usePotion(s.id)) this.msg = `${josa(it.name, '을', '를')} 마셨다.`;
+      if (it.mana) {
+        if (W.useManaPotion(s.id)) this.msg = `${josa(it.name, '을', '를')} 마셨다.`;
+        else { this.msg = 'MP가 이미 가득 차 있다.'; sfx.error(); }
+      } else if (W.usePotion(s.id)) this.msg = `${josa(it.name, '을', '를')} 마셨다.`;
       else { this.msg = 'HP가 이미 가득 차 있다.'; sfx.error(); }
     } else if (it.type === 'weapon' || it.type === 'armor') {
       equipFromSlot(this.sel);
@@ -115,13 +118,14 @@ export class InventoryScene extends Phaser.Scene {
     const stats = [
       ['레벨', G.level],
       ['HP', `${G.hp} / ${maxHp()}`],
+      ['MP', `${G.mp} / ${maxMp()}`],
       ['공격력', atk()],
       ['방어력', def()],
       ['경험치', ne === null ? `${G.exp} (MAX)` : `${G.exp} / ${ne}`],
       ['골드', `${G.gold} G`],
     ];
     stats.forEach(([k, v], i) => {
-      const y = 370 + i * 34;
+      const y = 360 + i * 30;
       add(text(this, RX, y, k, { size: 19, color: COLORS.dim }));
       add(text(this, RX + 300, y, String(v), { size: 19, bold: true, origin: [1, 0] }));
     });
@@ -147,11 +151,11 @@ export class InventoryScene extends Phaser.Scene {
         this.extraColor = after > now ? COLORS.good : after < now ? COLORS.bad : COLORS.text;
       }
     }
-    const DY = 540;
+    const DY = 548;
     add(text(this, GX, DY, title, { size: 22, bold: true, color: COLORS.gold }));
     add(text(this, GX, DY + 34, desc, { size: 18, wrap: 440 }));
-    if (extra) add(text(this, RX, DY + 4, extra, { size: 20, bold: true, color: this.extraColor }));
-    if (this.msg) add(text(this, RX, DY + 40, this.msg, { size: 18, color: COLORS.accent, wrap: 400 }));
+    if (extra) add(text(this, RX, 584, extra, { size: 19, bold: true, color: this.extraColor }));
+    if (this.msg) add(text(this, RX, 614, this.msg, { size: 18, color: COLORS.accent, wrap: 380 }));
   }
 
   close() {

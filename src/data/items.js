@@ -10,6 +10,10 @@ export const ITEMS = {
     name: '큰 빨간 포션', type: 'consumable', heal: 80, price: 40,
     desc: 'HP를 80 회복한다.',
   },
+  mana_potion: {
+    name: '마나 포션', type: 'consumable', mana: 20, price: 25,
+    desc: 'MP를 20 회복한다.',
+  },
   feather: {
     name: '귀환의 깃털', type: 'consumable', warp: true, price: 30,
     desc: '사용하면 즉시 햇살골 여관 앞으로 돌아간다.',
@@ -30,6 +34,19 @@ export const ITEMS = {
   crystal_sword: {
     name: '수정검', type: 'weapon', atk: 20, price: 400,
     desc: '수정 동굴의 빛을 머금은 전설의 검. 공격력 +20',
+  },
+  // style: 공격 방식 (sword 기본 / dagger 빠름 / spear 길게 찌르기 / axe 느리고 넓게)
+  venom_dagger: {
+    name: '독니 단검', type: 'weapon', atk: 7, price: 120, style: 'dagger', poison: 0.3,
+    desc: '아주 빠르게 찌르는 단검. 30% 확률로 적을 독에 빠뜨린다. 공격력 +7',
+  },
+  wind_spear: {
+    name: '바람의 창', type: 'weapon', atk: 15, price: 260, style: 'spear',
+    desc: '멀리까지 닿는 가벼운 창. 공격력 +15',
+  },
+  frost_axe: {
+    name: '서리 도끼', type: 'weapon', atk: 30, price: 500, style: 'axe',
+    desc: '느리지만 넓게 내려치는 얼음 도끼. 공격력 +30',
   },
 
   cloth: {
@@ -63,12 +80,20 @@ export const ITEMS = {
 export const SHOPS = {
   blacksmith: {
     name: '브론의 대장간',
-    items: ['iron_sword', 'steel_sword', 'leather_armor', 'iron_armor'],
+    items: ['iron_sword', 'steel_sword', 'wind_spear', 'leather_armor', 'iron_armor'],
   },
   general: {
     name: '미나의 잡화점',
-    items: ['red_potion', 'big_potion', 'feather'],
+    items: ['red_potion', 'big_potion', 'mana_potion', 'feather'],
   },
+};
+
+// 무기별 공격 방식: 쿨다운(ms), 칼이 닿는 범위(가로x세로), 몸에서 떨어진 거리, 이펙트 크기
+export const WEAPON_STYLES = {
+  sword: { cooldown: 400, w: 22, h: 22, reach: 11, fx: 0.85 },
+  dagger: { cooldown: 300, w: 16, h: 16, reach: 9, fx: 0.6 },
+  spear: { cooldown: 430, w: 34, h: 12, reach: 18, fx: 0.7, thrust: true },
+  axe: { cooldown: 650, w: 32, h: 30, reach: 12, fx: 1.25 },
 };
 
 export function sellPrice(id) {

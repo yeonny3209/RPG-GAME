@@ -107,6 +107,9 @@ export const sfx = {
   warp() { tone(300, 0.5, { type: 'sine', vol: 0.18, slide: 1200 }); },
   roar() { tone(110, 0.8, { type: 'sawtooth', vol: 0.25, slide: 55 }); noise(0.8, { vol: 0.25, freq: 300, type: 'lowpass' }); },
   bossDie() { for (let i = 0; i < 6; i++) noise(0.4, { vol: 0.3, freq: 600 - i * 80, when: i * 0.15, type: 'lowpass' }); tone(200, 1.5, { type: 'sawtooth', vol: 0.2, slide: 40 }); },
+  spin() { noise(0.25, { vol: 0.35, freq: 600, slide: 3500, q: 0.7 }); noise(0.2, { vol: 0.25, freq: 2500, slide: 700, when: 0.12 }); },
+  fire() { noise(0.3, { vol: 0.3, freq: 300, slide: 1200, type: 'lowpass' }); tone(220, 0.2, { type: 'sawtooth', vol: 0.12, slide: 440 }); },
+  thunder() { noise(0.35, { vol: 0.45, freq: 3000, slide: 200, q: 0.5 }); tone(60, 0.3, { type: 'square', vol: 0.15, slide: 40 }); },
   gameover() { [392, 349, 330, 262].forEach((f, i) => tone(f, 0.35, { vol: 0.18, type: 'triangle', when: i * 0.3 })); },
 };
 

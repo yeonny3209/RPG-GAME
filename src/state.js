@@ -12,6 +12,7 @@ function fresh() {
     level: 1,
     exp: 0,
     hp: 50,
+    mp: 20,
     gold: 0,
     inventory: [{ id: 'red_potion', count: 2 }],
     equipment: { weapon: 'wood_sword', armor: 'cloth' },
@@ -35,6 +36,7 @@ export function newGame() {
 // ---------------------------------------------------------------- 능력치
 
 export function maxHp() { return 50 + 12 * (G.level - 1); }
+export function maxMp() { return 20 + 4 * (G.level - 1); }
 export function atk() { return 5 + 2 * (G.level - 1) + (ITEMS[G.equipment.weapon]?.atk || 0); }
 export function def() { return 2 + (G.level - 1) + (ITEMS[G.equipment.armor]?.def || 0); }
 
@@ -50,8 +52,17 @@ export function addExp(n) {
     G.level++;
     gained++;
   }
-  if (gained) G.hp = maxHp();
+  if (gained) {
+    G.hp = maxHp();
+    G.mp = maxMp();
+  }
   return gained;
+}
+
+export function restoreMp(n) {
+  const before = G.mp;
+  G.mp = Math.min(maxMp(), G.mp + n);
+  return G.mp - before;
 }
 
 export function heal(n) {
@@ -169,6 +180,7 @@ export function load() {
     newGame();
     Object.assign(G, parsed.data);
     G.hp = Math.min(Math.max(1, G.hp), maxHp());
+    G.mp = Math.min(G.mp ?? maxMp(), maxMp()); // 예전 저장 데이터에는 MP가 없을 수 있다
     return true;
   } catch (e) {
     return false;

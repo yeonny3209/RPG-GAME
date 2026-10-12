@@ -8,7 +8,8 @@ const CONTROLS = [
   ['방향키 / WASD', '이동'],
   ['스페이스 / J', '공격'],
   ['E / Enter', '말 걸기, 상자 열기, 대화 넘기기'],
-  ['1', '포션 빠르게 마시기'],
+  ['1 / 2', 'HP 포션 / 마나 포션 마시기'],
+  ['Z X C V', '스킬 (레벨이 오르면 배움)'],
   ['I', '가방 (아이템 사용, 장비 장착)'],
   ['Q', '퀘스트 목록'],
   ['M', '소리 켜기/끄기'],
@@ -105,14 +106,14 @@ export class PauseScene extends Phaser.Scene {
 
     if (this.showHelp) {
       add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.5).setOrigin(0));
-      add(panel(this, GAME_W / 2 - 340, 100, 680, 520));
+      add(panel(this, GAME_W / 2 - 340, 90, 680, 560));
       add(text(this, GAME_W / 2, 140, '조작법', { size: 30, bold: true, color: COLORS.gold, origin: 0.5 }));
       CONTROLS.forEach(([k, v], i) => {
-        const y = 200 + i * 46;
+        const y = 180 + i * 44;
         add(text(this, GAME_W / 2 - 290, y, k, { size: 21, bold: true, color: COLORS.accent }));
         add(text(this, GAME_W / 2 - 60, y, v, { size: 21 }));
       });
-      add(text(this, GAME_W / 2, 590, 'E 또는 Esc로 닫기', { size: 16, color: COLORS.dim, origin: 0.5 }));
+      add(text(this, GAME_W / 2, 625, 'E 또는 Esc로 닫기', { size: 16, color: COLORS.dim, origin: 0.5 }));
     }
   }
 

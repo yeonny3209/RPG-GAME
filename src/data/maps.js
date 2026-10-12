@@ -389,7 +389,7 @@ export const MAPS = {
     ],
     chests: [
       { id: 'swamp_island', x: 20, y: 13, item: 'big_potion', count: 2 },
-      { id: 'swamp_gold', x: 41, y: 20, gold: 120 },
+      { id: 'swamp_dagger', x: 41, y: 20, item: 'venom_dagger', count: 1 },
     ],
     herbs: [{ id: 'herb_1', x: 4, y: 4 }, { id: 'herb_2', x: 40, y: 27 }, { id: 'herb_3', x: 6, y: 27 }],
     particles: 'fireflies',
@@ -412,7 +412,7 @@ export const MAPS = {
     ],
     chests: [
       { id: 'frost_potion', x: 35, y: 35, item: 'big_potion', count: 3 },
-      { id: 'frost_gold', x: 35, y: 15, gold: 200 },
+      { id: 'frost_axe', x: 35, y: 15, item: 'frost_axe', count: 1 },
     ],
     boss: { x: 19.5, y: 6, kind: 'golem' },
     particles: 'snow',

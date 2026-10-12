@@ -3,9 +3,10 @@
 import { TILE, ZOOM, FONT, DEBUG, INN_PRICE, FROST_MIN_LEVEL } from '../config.js';
 import { MAPS, LEGEND, T } from '../data/maps.js';
 import { ITEMS } from '../data/items.js';
+import { SKILLS } from '../data/skills.js';
 import { talk, NARRATION } from '../data/story.js';
 import {
-  G, bus, maxHp, def, calcDamage, addExp, heal, addItem, canAdd, countItem, removeItem,
+  G, bus, maxHp, maxMp, restoreMp, def, calcDamage, addExp, heal, addItem, canAdd, countItem, removeItem,
   equipIfBetter, questState, hasItem, save, atk,
 } from '../state.js';
 import { sfx, playMusic, stopMusic, toggleMute } from '../audio.js';
@@ -50,6 +51,9 @@ export class WorldScene extends Phaser.Scene {
     this.solids = this.physics.add.staticGroup();
     this.pickups = this.physics.add.group();
     this.orbs = this.physics.add.group();
+    this.shots = this.physics.add.group(); // 플레이어 파이어볼
+    this.skillReadyAt = this.skillReadyAt || SKILLS.map(() => 0);
+    this.mpAcc = 0;
 
     // 주인공
     const sp = mapDef.spawns[this.spawnName] || Object.values(mapDef.spawns)[0];
@@ -79,6 +83,11 @@ export class WorldScene extends Phaser.Scene {
       if (this.player.hurt(calcDamage(o.dmg, def()), o.x, o.y)) o.destroy();
     });
     this.physics.add.collider(this.orbs, this.top, (o) => o.destroy());
+    this.physics.add.overlap(this.shots, this.monsters, (sh, m) => {
+      if (!m.dead && !['sleep', 'intro'].includes(m.state)) this.explodeFireball(sh, m);
+    });
+    this.physics.add.collider(this.shots, this.top, (sh) => this.explodeFireball(sh, null));
+    this.physics.add.collider(this.shots, this.solids, (sh) => this.explodeFireball(sh, null));
 
     // 카메라
     const cam = this.cameras.main;
@@ -253,6 +262,8 @@ export class WorldScene extends Phaser.Scene {
     kb.on('keydown-Q', () => this.openOverlay('Quest'));
     kb.on('keydown-ESC', () => this.openOverlay('Pause'));
     kb.on('keydown-ONE', () => { if (this.canAct()) this.quickPotion(); });
+    kb.on('keydown-TWO', () => { if (this.canAct()) this.quickMana(); });
+    SKILLS.forEach((sk, i) => kb.on('keydown-' + sk.key, () => this.useSkill(i)));
     kb.on('keydown-M', () => this.toast(toggleMute() ? '소리를 껐다 (M)' : '소리를 켰다 (M)'));
 
     this.events.on('resume', () => {
@@ -282,6 +293,11 @@ export class WorldScene extends Phaser.Scene {
 
   update(time, delta) {
     G.playTime += delta;
+    this.mpAcc += delta;
+    if (this.mpAcc >= 1500) {
+      this.mpAcc -= 1500;
+      if (!this.player.dead) restoreMp(1);
+    }
     const k = this.keys;
     const ix = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
     const iy = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0);
@@ -321,7 +337,9 @@ export class WorldScene extends Phaser.Scene {
         const mr = new Phaser.Geom.Rectangle(b.x - 2, b.y - 4, b.width + 4, b.height + 6);
         if (Phaser.Geom.Intersects.RectangleToRectangle(rect, mr)) {
           hitSet.add(m);
-          m.takeHit(calcDamage(atk(), m.stats.def), this.player.x, this.player.y);
+          const hit = m.takeHit(calcDamage(atk(), m.stats.def), this.player.x, this.player.y);
+          const w = ITEMS[G.equipment.weapon];
+          if (hit && w.poison && Math.random() < w.poison) m.applyPoison(Math.max(2, Math.round(atk() * 0.2)));
         }
       }
     };
@@ -368,8 +386,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   gainExp(n) {
+    const before = G.level;
     const lv = addExp(n);
-    if (lv) this.levelUpFx();
+    if (!lv) return;
+    this.levelUpFx();
+    for (const sk of SKILLS) {
+      if (sk.level > before && sk.level <= G.level) {
+        this.time.delayedCall(600, () => this.toast(`새 스킬 「${sk.name}」${josa(sk.name, '을', '를').slice(sk.name.length)} 배웠다! (${sk.key} 키)`));
+      }
+    }
   }
 
   levelUpFx() {
@@ -384,7 +409,7 @@ export class WorldScene extends Phaser.Scene {
         onComplete: () => s.destroy(),
       });
     }
-    this.toast(`레벨 ${G.level} 달성! 능력치가 오르고 HP가 모두 회복되었다.`);
+    this.toast(`레벨 ${G.level} 달성! 능력치가 오르고 HP와 MP가 모두 회복되었다.`);
   }
 
   onMonsterKilled(m) {
@@ -742,6 +767,144 @@ export class WorldScene extends Phaser.Scene {
     }
     sfx.item();
     this.toast('나비가 마을로 돌아갔다! 토토에게 가 보자.');
+  }
+
+  // ---------------------------------------------------------------- 스킬
+
+  useSkill(i) {
+    if (!this.canAct()) return;
+    const sk = SKILLS[i];
+    const now = this.game.loop.time;
+    if (G.level < sk.level) {
+      this.toast(`${josa(sk.name, '은', '는')} 레벨 ${sk.level}에 배울 수 있다.`);
+      sfx.error();
+      return;
+    }
+    if (now < this.skillReadyAt[i]) { sfx.error(); return; }
+    if (G.mp < sk.mp) { this.toast('MP가 부족하다! (마나 포션: 2번 키)'); sfx.error(); return; }
+    if (sk.id === 'heal' && G.hp >= maxHp()) { this.toast('HP가 이미 가득 차 있다.'); return; }
+    if (sk.id === 'lightning' && !this.nearEnemies(110).length) { this.toast('주변에 적이 없다.'); return; }
+    G.mp -= sk.mp;
+    this.skillReadyAt[i] = now + sk.cooldown;
+    if (sk.id === 'spin') this.skillSpin(sk);
+    else if (sk.id === 'fireball') this.skillFireball(sk);
+    else if (sk.id === 'heal') this.skillHeal(sk);
+    else if (sk.id === 'lightning') this.skillLightning(sk);
+  }
+
+  nearEnemies(range) {
+    const p = this.player;
+    return this.monsters.getChildren()
+      .filter((m) => !m.dead && m.body && !['sleep', 'intro'].includes(m.state))
+      .map((m) => ({ m, d: Phaser.Math.Distance.Between(p.x, p.y, m.x, m.y) }))
+      .filter((o) => o.d < range)
+      .sort((a, b) => a.d - b.d)
+      .map((o) => o.m);
+  }
+
+  skillSpin(sk) {
+    const p = this.player;
+    p.attackUntil = this.time.now + 300;
+    p.setVelocity(0);
+    sfx.spin();
+    for (let k = 0; k < 4; k++) {
+      const s = this.add.image(p.x, p.y + 3, 'slash', 0).setDepth(p.y + 30).setScale(1.1).setAngle(k * 90);
+      this.tweens.add({ targets: s, angle: k * 90 + 360, alpha: 0, scale: 1.5, duration: 380, onComplete: () => s.destroy() });
+    }
+    const ring = this.add.circle(p.x, p.y + 3, 6).setStrokeStyle(2, 0xa8d0ff, 1).setDepth(9000);
+    this.tweens.add({ targets: ring, scale: 5, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
+    for (const m of this.nearEnemies(32)) {
+      m.takeHit(calcDamage(Math.round(atk() * sk.power), m.stats.def), p.x, p.y);
+    }
+  }
+
+  skillFireball(sk) {
+    const p = this.player;
+    const v = DIR[p.facing];
+    const f = this.shots.create(p.x + v.x * 8, p.y + 3 + v.y * 8, 'fireball', 0);
+    f.power = sk.power;
+    f.body.setCircle(4, 2, 2);
+    f.setVelocity(v.x * 170, v.y * 170);
+    f.setDepth(9000);
+    this.tweens.add({ targets: f, angle: 360, duration: 400, repeat: -1 });
+    this.time.delayedCall(1500, () => { if (f.active) this.explodeFireball(f, null); });
+    sfx.fire();
+  }
+
+  explodeFireball(f, target) {
+    if (!f.active || f.done) return;
+    f.done = true;
+    const x = f.x;
+    const y = f.y;
+    f.destroy();
+    sfx.hit();
+    const boom = this.add.circle(x, y, 4, 0xffa030, 0.8).setDepth(9000);
+    this.tweens.add({ targets: boom, scale: 5, alpha: 0, duration: 260, onComplete: () => boom.destroy() });
+    // 방어력을 절반만 적용
+    const dmg = (m) => calcDamage(Math.round(atk() * f.power), m.stats.def / 2);
+    if (target) target.takeHit(dmg(target), x, y);
+    for (const m of this.monsters.getChildren()) {
+      if (m === target || m.dead || !m.body || ['sleep', 'intro'].includes(m.state)) continue;
+      if (Phaser.Math.Distance.Between(x, y, m.x, m.y) < 20) m.takeHit(Math.max(1, Math.round(dmg(m) / 2)), x, y);
+    }
+  }
+
+  skillHeal(sk) {
+    const p = this.player;
+    const n = heal(Math.round(maxHp() * sk.power));
+    sfx.heal();
+    this.floatText(p.x, p.y - 12, '+' + n, '#7ae07a', 8);
+    for (let i = 0; i < 10; i++) {
+      const s = this.add.image(p.x + Phaser.Math.Between(-8, 8), p.y + Phaser.Math.Between(-2, 8), 'sparkle', 0)
+        .setTint(0x80ff90).setDepth(9400);
+      this.tweens.add({ targets: s, y: s.y - 18, alpha: 0, duration: 700, delay: i * 40, onComplete: () => s.destroy() });
+    }
+  }
+
+  skillLightning(sk) {
+    const targets = this.nearEnemies(110).slice(0, 4);
+    this.cameras.main.flash(120, 255, 255, 200);
+    targets.forEach((m, i) => {
+      this.time.delayedCall(i * 90, () => {
+        if (m.dead || !m.active) return;
+        sfx.thunder();
+        const g = this.add.graphics().setDepth(9600);
+        g.lineStyle(2, 0xfff070, 1);
+        g.beginPath();
+        let x = m.x + Phaser.Math.Between(-6, 6);
+        let y = m.y - 90;
+        g.moveTo(x, y);
+        while (y < m.y - 4) {
+          y += 10;
+          x = m.x + Phaser.Math.Between(-5, 5);
+          g.lineTo(x, Math.min(y, m.y));
+        }
+        g.strokePath();
+        this.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() });
+        m.takeHit(calcDamage(Math.round(atk() * sk.power), m.stats.def), m.x, m.y - 10);
+      });
+    });
+  }
+
+  quickMana() {
+    if (!countItem('mana_potion')) {
+      this.toast('마나 포션이 없다! (잡화점에서 판다)');
+      sfx.error();
+      return;
+    }
+    this.useManaPotion('mana_potion');
+  }
+
+  useManaPotion(id) {
+    if (G.mp >= maxMp()) {
+      this.toast('MP가 이미 가득 차 있다.');
+      return false;
+    }
+    const n = restoreMp(ITEMS[id].mana);
+    removeItem(id, 1);
+    sfx.heal();
+    this.floatText(this.player.x, this.player.y - 10, '+' + n + ' MP', '#7ab0ff');
+    return true;
   }
 
   quickPotion() {

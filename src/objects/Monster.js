@@ -2,6 +2,7 @@
 
 import { MONSTERS } from '../data/monsters.js';
 import { sfx } from '../audio.js';
+import { bus } from '../state.js';
 
 const BODY = {
   slime: [12, 8, 2, 7],
@@ -287,6 +288,30 @@ export class Monster extends Phaser.Physics.Arcade.Sprite {
     this.state = 'hurt';
     this.stateUntil = this.scene.time.now + 160;
     return true;
+  }
+
+  // 독: 0.6초마다 4번 피해 (이미 걸려 있으면 횟수만 다시 채움)
+  applyPoison(perTick) {
+    if (this.dead) return;
+    this.poisonLeft = 4;
+    this.setTint(0x90ff70);
+    if (this.poisonTimer) return;
+    this.poisonTimer = this.scene.time.addEvent({
+      delay: 600, loop: true,
+      callback: () => {
+        if (this.dead || !this.active || this.poisonLeft <= 0) {
+          if (this.poisonTimer) this.poisonTimer.remove();
+          this.poisonTimer = null;
+          if (this.active && !this.dead) this.clearTint();
+          return;
+        }
+        this.poisonLeft--;
+        this.hp = Math.max(0, this.hp - perTick);
+        this.scene.floatText(this.x + 4, this.y - 8, String(perTick), '#9aff70');
+        if (this.isBoss) bus.emit('boss', { show: true, name: this.stats.name, hp: this.hp, max: this.maxHp });
+        if (this.hp <= 0) this.die();
+      },
+    });
   }
 
   die() {

@@ -536,6 +536,65 @@ function sword(blade, hilt) {
   return p.outline(OUT);
 }
 
+function dagger() {
+  const p = new Pix(16, 16);
+  for (let i = 0; i < 6; i++) { p.set(6 + i, 9 - i, '#c8e0b0'); p.set(7 + i, 9 - i, '#8ab070'); }
+  p.set(12, 3, '#e0ffd0');
+  p.rect(4, 9, 4, 1, '#5a3a6a'); p.rect(6, 8, 1, 4, '#5a3a6a');
+  p.set(4, 12, '#3a2a1a'); p.set(5, 11, '#3a2a1a');
+  p.set(9, 6, '#7aff50');
+  return p.outline(OUT);
+}
+
+function spear() {
+  const p = new Pix(16, 16);
+  for (let i = 0; i < 11; i++) p.set(2 + i, 13 - i, '#a07a4a');
+  p.rect(12, 1, 3, 3, '#d8f0ff'); p.set(14, 0, '#ffffff'); p.set(11, 2, '#d8f0ff'); p.set(13, 4, '#d8f0ff');
+  p.set(11, 4, '#7ad0ff'); p.set(10, 5, '#7ad0ff');
+  return p.outline(OUT);
+}
+
+function axe() {
+  const p = new Pix(16, 16);
+  for (let i = 0; i < 11; i++) p.set(3 + i, 14 - i, '#6a4a2a');
+  p.ellipse(11, 5, 4, 4.5, '#9ad8f8', (x) => x >= 10);
+  p.rect(9, 2, 2, 6, '#9ad8f8');
+  p.rect(13, 3, 1, 5, '#e0f8ff');
+  return p.outline(OUT);
+}
+
+function skillIcon(kind) {
+  const p = new Pix(16, 16);
+  if (kind === 'spin') {
+    for (let a = 0; a < 300; a += 8) {
+      const r = (a * Math.PI) / 180;
+      p.set(8 + Math.cos(r) * 5.5, 8 + Math.sin(r) * 5.5, a > 240 ? '#ffffff' : '#a8d0ff');
+    }
+    p.rect(12, 2, 2, 3, '#ffffff'); p.rect(11, 4, 3, 1, '#ffffff');
+    p.rect(7, 7, 2, 2, '#e0e8f0');
+  } else if (kind === 'fireball') {
+    p.ellipse(9, 9, 4.5, 4.5, '#ff7a20');
+    p.ellipse(9.5, 8.5, 2.6, 2.6, '#ffd040');
+    p.set(9, 8, '#ffffff');
+    p.rect(2, 7, 3, 1, '#ff9a30'); p.rect(3, 10, 3, 1, '#ff9a30'); p.rect(1, 9, 2, 1, '#ffd040');
+  } else if (kind === 'heal') {
+    p.rect(6, 2, 4, 12, '#5ae07a'); p.rect(2, 6, 12, 4, '#5ae07a');
+    p.rect(7, 3, 2, 10, '#c8ffd0'); p.rect(3, 7, 10, 2, '#c8ffd0');
+  } else if (kind === 'lightning') {
+    [[10, 1], [9, 2], [8, 3], [7, 4], [6, 5], [5, 6], [6, 7], [7, 7], [8, 7], [9, 7], [8, 8], [7, 9], [6, 10], [5, 11], [4, 12], [3, 13]]
+      .forEach(([x, y]) => { p.set(x, y, '#ffe040'); p.set(x + 1, y, '#fff6a0'); });
+  }
+  return p.outline(OUT);
+}
+
+function fireball() {
+  const p = new Pix(12, 12);
+  p.ellipse(6, 6, 5, 5, '#ff5a10');
+  p.ellipse(6.5, 5.5, 3.2, 3.2, '#ffb030');
+  p.ellipse(6.8, 5.2, 1.5, 1.5, '#fff6c0');
+  return p;
+}
+
 function armor(color) {
   const p = new Pix(16, 16);
   p.rect(4, 3, 8, 10, color);
@@ -939,6 +998,12 @@ export function buildTextures(scene) {
   addSheet(scene, 'icon_leather_armor', [armor('#a06a3a')]);
   addSheet(scene, 'icon_iron_armor', [armor('#9aa4b4')]);
   addSheet(scene, 'icon_frost_armor', [armor('#8ad8f8')]);
+  addSheet(scene, 'icon_venom_dagger', [dagger()]);
+  addSheet(scene, 'icon_wind_spear', [spear()]);
+  addSheet(scene, 'icon_frost_axe', [axe()]);
+  addSheet(scene, 'icon_mana_potion', [potion('#3a7aff')]);
+  for (const k of ['spin', 'fireball', 'heal', 'lightning']) addSheet(scene, 'skill_' + k, [skillIcon(k)]);
+  addSheet(scene, 'fireball', [fireball()]);
   addSheet(scene, 'icon_shadow_key', [keyIcon()]);
   addSheet(scene, 'icon_crown', [crown()]);
 }

@@ -3,6 +3,11 @@
 import { PLAYER } from '../config.js';
 import { G } from '../state.js';
 import { sfx } from '../audio.js';
+import { ITEMS, WEAPON_STYLES } from '../data/items.js';
+
+export function weaponStyle() {
+  return WEAPON_STYLES[ITEMS[G.equipment.weapon]?.style || 'sword'];
+}
 
 export const DIR = {
   down: { x: 0, y: 1 },
@@ -71,24 +76,30 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   // 공격 시작. 성공하면 칼이 닿는 범위(사각형)를 돌려준다.
   tryAttack(time) {
     if (this.dead || time < this.nextAttack || time < this.knockUntil) return null;
-    this.nextAttack = time + PLAYER.attackCooldown;
-    this.attackUntil = time + PLAYER.attackDuration;
+    const st = weaponStyle();
+    this.nextAttack = time + st.cooldown;
+    this.attackUntil = time + Math.min(PLAYER.attackDuration, st.cooldown - 30);
     this.setVelocity(0);
     this.anim('idle');
     sfx.swing();
 
     const v = DIR[this.facing];
-    const fx = this.x + v.x * 11;
-    const fy = this.y + 3 + v.y * 11;
+    const fx = this.x + v.x * st.reach;
+    const fy = this.y + 3 + v.y * st.reach;
     const s = this.scene.add.image(fx, fy, 'slash', 0)
       .setAngle(SLASH_ANGLE[this.facing])
       .setDepth(this.y + 30)
-      .setScale(0.85);
+      .setScale(st.fx);
+    if (st.thrust) s.setScale(st.fx * 1.6, st.fx * 0.55); // 창: 가늘고 길게
     this.scene.tweens.add({
-      targets: s, alpha: 0, scale: 1.1, duration: 200, ease: 'Quad.easeOut',
+      targets: s, alpha: 0, scaleX: s.scaleX * 1.25, scaleY: s.scaleY * 1.25, duration: 200, ease: 'Quad.easeOut',
       onComplete: () => s.destroy(),
     });
-    return new Phaser.Geom.Rectangle(fx - 11, fy - 11, 22, 22);
+    // 가로로 볼 때와 세로로 볼 때 범위의 가로세로가 바뀐다
+    const horiz = v.x !== 0;
+    const w = horiz ? st.w : st.h;
+    const h = horiz ? st.h : st.w;
+    return new Phaser.Geom.Rectangle(fx - w / 2, fy - h / 2, w, h);
   }
 
   hurt(dmg, fromX, fromY) {
